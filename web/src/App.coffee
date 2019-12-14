@@ -1,7 +1,7 @@
 import React, { Component } from 'react'
 import L from 'react-dom-factories'
 import Object from './hosta/Object.coffee'
-import WebSocket from './helpers/WS.coffee'
+import WebSocket from './websocket/Websocket.coffee'
 L_ = React.createElement
 import './App.less'
 
@@ -10,19 +10,34 @@ Greeting = ({name})->
     L.h2 style:textAlign:'center', "Hello, #{name}"
 
 class Greet extends Component
-  constructor:(props)->
-    super props
+  state : { value:'a' }
+  change:(e)=>
+    value = e.target.value
+    @setState {value}
+    @props.onChange value
   render: ->
-    L.div className:'greet',"Hello, #{@props.name}"
+    L.div className:'gret',
+      L.div className:'greet',"Hello, #{@props.name}"
+      L.input
+        type:'text'
+        value:@state.value
+        onChange:(e)=>@change e
 
 
 export default class App extends Component
+  state : {
+    value:'ws://localhost:8082/'
+  }
   constructor:(props)->
     super(props)
      
   render: ->
     L.div className:'app',
-      L_ WebSocket, url:'ws://localhost:7700',
-        (data)->
-          L_ Greet, name:data
+      L.input
+        type:'text',
+        value: @state.value
+        onChange:({target:value:value})=>@setState {value}
+      L_ WebSocket, url:@state.value,
+        (data, reply)->
+          L_ Greet, name:data, onChange:reply
 
