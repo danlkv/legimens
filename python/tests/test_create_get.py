@@ -1,5 +1,4 @@
 import multiprocessing as thr
-import json
 import time
 from utils.websocket_client import send_iter_sync, send_iter
 from hosta import Hobject, Happ

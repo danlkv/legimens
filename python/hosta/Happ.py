@@ -49,14 +49,25 @@ class Happ:
     async def _handler(self, ws):
         try:
             log.info(f"New connection from {ws.path}")
-            refv = ws.path.split('/')[-1]
+            refv = ws.path.split('/')[1]
             log.info(f"Ref {refv}")
             log.info(f"Children {self._child_obj}")
+            # if anything is in the path
             if len(refv)>0:
-                # Subscribe this websocket to monitor vars
+                # Subscribe this client to monitor vars
                 self._subscr[refv].append( ws )
+                # send the current object to it
+                child = self._child_obj[refv]
+                # if updates to other clients sent, 
+                # Initiate state for current cliet
+                if not child._touched:
+                    yield child.serial()
+
+                while True:
+                    msg = await ws.get_message()
+                    child.inbound = msg
                 yield None
-                await trio.sleep(.5)
+                await trio.sleep_forever()
 
             else:
                 yield ref(self.vars)
@@ -67,16 +78,19 @@ class Happ:
         while True:
             for ref in self._child_obj:
                 listeners  = self._subscr[ref]
+                alive = [ws for ws in listeners if not ws.closed]
+                self._subscr[ref] = alive
+                listeners = alive
                 if len(listeners) > 0:
                     child = self._child_obj[ref]
                     if child._touched:
-                        for ws in listeners:
-                            message = child.serial()
-                            try:
+                        message = child.serial()
+                        try:
+                            for ws in listeners:
                                 await ws.send_message(message)
-                                child._mark_untouched()
-                            except Exception as e:
-                                log.error("Error sending update to %s", ws)
+                            child._mark_untouched()
+                        except Exception as e:
+                            log.error("Error sending update to {}: {}", ws, e)
                     else:
                         log.debug("Child {} not touched", ref)
                 else:
@@ -85,7 +99,7 @@ class Happ:
             if not self._running:
                 self._cancel_scope.cancel()
 
-            await trio.sleep(.1)
+            await trio.sleep(.5)
 
     async def _start(self):
         with self._cancel_scope:
@@ -93,6 +107,7 @@ class Happ:
             async with trio.open_nursery() as nursery:
                 nursery.start_soon(start_server, *args+(nursery,))
                 nursery.start_soon(self._monitor_vars)
+        log.info("App stopped")
         print("1")
 
     def run_sync(self):
