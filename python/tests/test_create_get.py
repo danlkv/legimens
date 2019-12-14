@@ -51,6 +51,5 @@ def test_create():
     app.vars.title = 'Changed title'
     time.sleep(.2)
     p1.join()
-    p.terminate()
-    p.join()
 
+    app.stop()

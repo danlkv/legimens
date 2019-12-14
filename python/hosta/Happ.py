@@ -23,6 +23,8 @@ class Happ:
         self._on_val_set('v',self.vars)
         log.info(f"Refs {sys.getrefcount(self.vars)}")
         log.info(f"Refs {gc.get_referrers(self.vars)}")
+        self._cancel_scope = trio.CancelScope()
+        self._running = True
 
     def _add_hobject(self, hobject):
         self._child_obj[ref(hobject)] = hobject
@@ -80,13 +82,18 @@ class Happ:
                         log.debug("Child {} not touched", ref)
                 else:
                     log.debug("No listeners for {}", ref)
+
+            if not self._running:
+                self._cancel_scope.cancel()
+
             await trio.sleep(.1)
 
     async def _start(self):
-        args = (self.addr, self.port, self._handler)
-        async with trio.open_nursery() as nursery:
-            nursery.start_soon(start_server, *args+(nursery,))
-            nursery.start_soon(self._monitor_vars)
+        with self._cancel_scope:
+            args = (self.addr, self.port, self._handler)
+            async with trio.open_nursery() as nursery:
+                nursery.start_soon(start_server, *args+(nursery,))
+                nursery.start_soon(self._monitor_vars)
         print("1")
 
     def run_sync(self):
@@ -96,4 +103,6 @@ class Happ:
         t = thr.Process(target=trio.run, args=(self._start,))
         t.start()
         return t
+    def stop(self):
+        self._running = False
 
