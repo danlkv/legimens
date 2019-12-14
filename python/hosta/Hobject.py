@@ -1,4 +1,6 @@
 from hosta.helpers.AttrDict import AttrSubscrDict
+from hosta.helpers.dictMap import obj_map
+
 import json
 
 class Hobject(AttrSubscrDict):
@@ -18,12 +20,20 @@ class Hobject(AttrSubscrDict):
 
     def _get_child_obj(self):
         children = []
+        def _app(o):
+            if isinstance(o, Hobject):
+                children.append(o)
         for k in self:
-            if isinstance(self[k], Hobject):
-                children.append(self[k])
+            obj_map(self[k], pre=_app, post=lambda x: x)
         return children
 
     def serial(self):
+        def _tostr(o):
+            if o == self: return
+            if isinstance(o, Hobject):
+                return repr(o)
 
-        x = json.dumps({k:str(v) for k,v in self.items()})
+        x = obj_map(self, _tostr)
+        x = json.dumps(x)
         return x
+

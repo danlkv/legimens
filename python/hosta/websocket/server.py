@@ -25,6 +25,7 @@ async def ws_serve(addr, port, iterable_fn, nursery=None):
                               handler_nursery=nursery)
     except OSError as ose:
         log.error(f"Websocket start on {port} failed: {ose}")
+        raise
         return
     log.info("Websocket terminates")
 

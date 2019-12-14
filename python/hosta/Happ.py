@@ -10,7 +10,6 @@ from loguru import logger as log
 
 def ref(obj):
     return repr(obj)
-    return 'HR'+str(id(obj))
 
 class Happ:
     def __init__(self, addr, port):
