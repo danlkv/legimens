@@ -1,4 +1,5 @@
 from hosta.websocket.server import start_server
+import multiprocessing.dummy as thr
 from collections import defaultdict
 import gc
 import trio
@@ -70,9 +71,13 @@ class Happ:
                     if child._touched:
                         for ws in listeners:
                             message = child.serial()
-                            await ws.send_message(message)
+                            try:
+                                await ws.send_message(message)
+                                child._mark_untouched()
+                            except Exception as e:
+                                log.error("Error sending update to %s", ws)
                     else:
-                        log.debug("Child %s not touched", ref)
+                        log.debug("Child {} not touched", ref)
                 else:
                     log.debug("No listeners for {}", ref)
             await trio.sleep(.1)
@@ -84,6 +89,11 @@ class Happ:
             nursery.start_soon(self._monitor_vars)
         print("1")
 
-    def run(self):
+    def run_sync(self):
         trio.run(self._start)
+
+    def run(self):
+        t = thr.Process(target=trio.run, args=(self._start,))
+        t.start()
+        return t
 

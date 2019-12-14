@@ -7,7 +7,8 @@ async def send_iter(addr, iterable):
         async with open_websocket_url(addr) as ws:
             try:
                 async for message in iterable(ws):
-                    await ws.send_message(message)
+                    if message is not None:
+                        await ws.send_message(message)
             except StopIteration:
                 print("Closing connection")
                 return
