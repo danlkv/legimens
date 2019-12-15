@@ -5,11 +5,9 @@ import json
 from loguru import logger as log
 
 from hosta import Hobject
+from hosta.Hobject import ref
 from hosta.helpers.dictMap import obj_map
 from hosta.websocket.server import start_server
-
-def ref(obj):
-    return repr(obj)
 
 class Happ:
     def __init__(self, addr, port):
@@ -68,13 +66,13 @@ class Happ:
 
     async def _monitor_vars(self):
         while True:
-            for ref in self._child_obj:
-                listeners  = self._subscr[ref]
+            for r in self._child_obj:
+                listeners  = self._subscr[r]
                 alive = [ws for ws in listeners if not ws.closed]
-                self._subscr[ref] = alive
+                self._subscr[r] = alive
                 listeners = alive
                 if len(listeners) > 0:
-                    child = self._child_obj[ref]
+                    child = self._child_obj[r]
                     if child._touched:
                         message = child.serial()
                         try:
@@ -87,7 +85,7 @@ class Happ:
             if not self._running:
                 self._cancel_scope.cancel()
 
-            await trio.sleep(.2)
+            await trio.sleep(.02)
 
     async def _start(self):
         with self._cancel_scope:

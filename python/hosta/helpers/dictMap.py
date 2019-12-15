@@ -1,15 +1,16 @@
-def obj_map(d, pre, post=lambda x: x):
+def obj_map(d, pre):
     x = pre(d)
     if x is not None: return x
+    print (x)
 
     if isinstance(d, list):
-        return [obj_map(x, pre, post) for x in d]
+        return [obj_map(x, pre) for x in d]
     if isinstance(d, dict):
         d_ = {}
         for k in d:
-            d_[k] = obj_map(d[k], pre, post)
+            d_[k] = obj_map(d[k], pre)
         return d_
-    return post(d)
+    return d
 
-def inplace_obj_map(d, pre, post):
+def inplace_obj_map(d, pre):
     raise NotImplementedError
