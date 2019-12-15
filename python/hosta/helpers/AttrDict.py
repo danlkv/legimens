@@ -40,7 +40,6 @@ class AttrSubscrDict(AttrCbDict):
         self._get_subscribers.append(subs)
 
     def subscribe_set(self, subs):
-        print("Subscribing",self)
         self._set_subscribers.append(subs)
 
     def _get(self, name):

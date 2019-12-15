@@ -18,11 +18,11 @@ export default class WebSock extends Component
     @setState {message}
 
   send: (message) =>
-    console.log("Sending", message)
     @ws.send message
 
   render:()->
     if @props.url != @ws?.url
+      @ws?.close 1000
       @_init_ws @props
     @props.children @state?.message.data, @send
 

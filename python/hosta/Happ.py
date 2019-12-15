@@ -1,12 +1,12 @@
-from hosta.websocket.server import start_server
 import multiprocessing.dummy as thr
 from collections import defaultdict
-import gc
 import trio
-import sys
-from hosta import Hobject
 import json
 from loguru import logger as log
+
+from hosta import Hobject
+from hosta.helpers.dictMap import obj_map
+from hosta.websocket.server import start_server
 
 def ref(obj):
     return repr(obj)
@@ -16,32 +16,24 @@ class Happ:
         self.addr = addr
         self.port = port
         self.vars = Hobject()
-        self.vars.subscribe_set(self._on_val_set)
         self._child_obj = {}
         self._subscr = defaultdict(lambda: [], {})
-        self._on_val_set('v',self.vars)
-        log.info(f"Refs {sys.getrefcount(self.vars)}")
-        log.info(f"Refs {gc.get_referrers(self.vars)}")
         self._cancel_scope = trio.CancelScope()
         self._running = True
 
-    def _add_hobject(self, hobject):
-        self._child_obj[ref(hobject)] = hobject
-        print("Added child object",hobject)
-        for child in hobject._get_child_obj():
-            print("Added child objec",hobject)
-            self._child_obj[ref(child)] = child
-            child.subscribe_set(self._on_val_set)
-        hobject.subscribe_set(self._on_val_set)
+        self._on_val_set(None,self.vars)
+
+    def _register_child(self, o):
+        if isinstance(o, Hobject):
+            o.subscribe_set(self._on_val_set)
+            self._child_obj[ref(o)] = o
+            log.debug("Added child object {}", o)
+            # returning none makes mapper
+            # traverse the whole dict tree 
+            return None
 
     def _on_val_set(self, name, value):
-        print("on_val_set", name, value, type(value))
-        if isinstance(value, Hobject):
-            self._add_hobject(value)
-        if isinstance(value, list):
-            print("List")
-            [self._on_val_set('iterm',x) for x in value]
-        print("Done")
+        obj_map(value, self._register_child)
 
     def _ser_vars(self):
         return json.dumps(self.vars)
@@ -50,8 +42,8 @@ class Happ:
         try:
             log.info(f"New connection from {ws.path}")
             refv = ws.path.split('/')[1]
-            log.info(f"Ref {refv}")
-            log.info(f"Children {self._child_obj}")
+            log.debug(f"Children {self._child_obj}")
+            log.debug(f"Subscribers {self._subscr}")
             # if anything is in the path
             if len(refv)>0:
                 # Subscribe this client to monitor vars
@@ -91,15 +83,11 @@ class Happ:
                             child._mark_untouched()
                         except Exception as e:
                             log.error("Error sending update to {}: {}", ws, e)
-                    else:
-                        log.debug("Child {} not touched", ref)
-                else:
-                    log.debug("No listeners for {}", ref)
 
             if not self._running:
                 self._cancel_scope.cancel()
 
-            await trio.sleep(.5)
+            await trio.sleep(.2)
 
     async def _start(self):
         with self._cancel_scope:
@@ -108,7 +96,6 @@ class Happ:
                 nursery.start_soon(start_server, *args+(nursery,))
                 nursery.start_soon(self._monitor_vars)
         log.info("App stopped")
-        print("1")
 
     def run_sync(self):
         trio.run(self._start)
