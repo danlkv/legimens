@@ -47,7 +47,8 @@ class Happ:
             refv = ws.path.split('/')[1]
             # if anything is in the path
             if len(refv)>0:
-                self._handle_obj_ref(ws, refv)
+                async for msg in self._handle_obj_ref(ws, refv):
+                    yield msg
 
             else:
                 # return link to root element
@@ -63,9 +64,10 @@ class Happ:
         # if updates to other clients sent, 
         # Initiate state for current cliet
         if not child._touched:
+            log.info("yield")
             yield child.serial()
 
-        self._child_updating_loop(ws, child)
+        await self._child_updating_loop(ws, child)
 
         yield None
         # save ws connection open
@@ -73,6 +75,7 @@ class Happ:
 
     async def _child_updating_loop(self, ws, child):
         while True:
+            log.debug("Listening for updates for {}", ref(child))
             msg = await ws.get_message()
             try:
                 updates = json.loads(msg)
