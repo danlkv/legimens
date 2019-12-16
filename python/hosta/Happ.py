@@ -54,7 +54,7 @@ class Happ:
                 # return link to root element
                 yield ref(self.vars)
         except Exception as e:
-            log.error(e)
+            log.error("Handling {} error:{}", type(e), e)
 
     async def _handle_obj_ref(self, ws, ref):
         # Subscribe this client to monitor vars
@@ -74,14 +74,16 @@ class Happ:
         await trio.sleep_forever()
 
     async def _child_updating_loop(self, ws, child):
+        log.debug("Listening for updates for {}", ref(child))
         while True:
-            log.debug("Listening for updates for {}", ref(child))
             msg = await ws.get_message()
             try:
                 updates = json.loads(msg)
+                log.debug("Updates for {} : {}", ref(child), updates)
                 child.update( updates )
+                child._touched = True
             except json.JSONDecodeError:
-                log.error("JSON decode error: {}",msg)
+                log.error("JSON decode error: {}", msg)
 
 ## ## ## ## ## ## Serving updates ## ## ## ## ## ## 
 
