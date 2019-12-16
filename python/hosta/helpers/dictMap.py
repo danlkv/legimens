@@ -1,7 +1,6 @@
 def obj_map(d, pre):
     x = pre(d)
     if x is not None: return x
-    print (x)
 
     if isinstance(d, list):
         return [obj_map(x, pre) for x in d]

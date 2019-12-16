@@ -41,7 +41,7 @@ class Happ:
     async def _handler(self, ws):
         try:
             log.info(f"New connection from {ws.path}")
-            log.debug(f"Children {self._child_obj}")
+            log.debug(f"Children {self._child_obj.keys()}")
             log.debug(f"Subscribers {self._subscr}")
 
             refv = ws.path.split('/')[1]
