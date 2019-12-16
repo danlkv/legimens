@@ -1,4 +1,5 @@
-import multiprocessing as thr
+from multiprocessing import Process, Queue
+import json
 import time
 from utils.websocket_client import send_iter_sync, send_iter
 from hosta import Hobject, Happ
@@ -24,31 +25,45 @@ def setup():
     return app
 
 def test_create():
-    app = setup()
-    app.run()
-    time.sleep(.1)
+    responses = Queue()
 
     async def init(ws):
         msg = await ws.get_message()
         root_id = msg
-        print('root_id', root_id)
+        print('<<<root_id<<<', root_id)
         async def root_iter(ws):
             while True:
                 root = await ws.get_message()
-                print('<<<<root<<<<<', root)
+                print('<<<<root_obj<<<<<', root)
+                responses.put(root)
                 yield None
         await send_iter(f'ws://{addr}:{port}/{root_id}',root_iter)
         yield None
         return
 
+    app = setup()
+    p1 = Process(target=send_iter_sync, args=(f'ws://{addr}:{port}',init))
+    p2 = Process(target=send_iter_sync, args=(f'ws://{addr}:{port}',init))
 
-    p1= thr.Process(target=send_iter_sync, args=(f'ws://{addr}:{port}',init))
-    p2= thr.Process(target=send_iter_sync, args=(f'ws://{addr}:{port}',init))
+    app.run()
+    time.sleep(.2)
+
     p1.start()
     p2.start()
-    time.sleep(.2)
+
+    time.sleep(.15)
+    assert responses.qsize()==2
+    for _ in range(2):
+        assert responses.get() == app.vars.serial()
+
     app.vars.title = 'Changed title'
-    time.sleep(.2)
-    p1.join()
+    time.sleep(.05)
+
+    assert responses.qsize()==2
+    for _ in range(2):
+        r = json.loads(responses.get())
+        assert r['title']  == app.vars.title
 
     app.stop()
+    p1.join()
+    p2.join()
