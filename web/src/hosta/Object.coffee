@@ -1,11 +1,20 @@
 import React, { Component } from 'react'
+L_ = React.createElement
 
-#export default Object = (C)=> class extends C {
+import Websocket from '../websocket/Websocket.coffee'
+
 export default class Object extends Component
   constructor:(props) ->
     super props
     @name = @constructor.name
-  bar: ->
-    console.log("Inside s")
+
   render: ->
-    L.div className:'d', 'hello'
+    {refval, addr} = @props
+    console.log(".",@props)
+    url = addr + refval
+
+    L_ Websocket, url:url, (data, update) =>
+      setAttr = (attr, value) ->
+        update JSON.stringify [attr]:value
+
+      @props.children data, setAttr

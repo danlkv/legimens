@@ -1,3 +1,3 @@
-export default Moma = ()->
-  console.log("Mama")
+import Object from './hosta/Object.coffee'
+export default Object
 

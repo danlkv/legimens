@@ -1,6 +1,7 @@
 {
   "name": "legimens",
-  "author": "Danil Lykov @danlkv (http://lykov.tech)", "version": "1.0.0",
+  "author": "Danil Lykov @danlkv (http://lykov.tech)", 
+  "version": "1.0.3",
   "main": "lib/legimens.js",
   "license": "GPL-3.0-only",
   "scripts": {

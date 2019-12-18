@@ -1,7 +1,6 @@
 import React, { Component } from 'react'
 import L from 'react-dom-factories'
 import Object from './hosta/Object.coffee'
-import WebSocket from './websocket/Websocket.coffee'
 L_ = React.createElement
 import './App.less'
 
@@ -36,8 +35,12 @@ export default class App extends Component
       L.input
         type:'text',
         value: @state.value
-        onChange:({target:value:value})=>@setState {value}
-      L_ WebSocket, url:@state.value,
-        (data, reply)->
-          L_ Greet, name:data, onChange:reply
+        onChange:({target:value:value}) => @setState {value}
+      L_ Object,
+        addr:@state.value
+        refval:''
+        (data, setattr)->
+          change = (value)->
+            setattr 'value', value
+          L_ Greet, name:data, onChange:change
 
