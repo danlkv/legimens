@@ -27,9 +27,12 @@ class Hobject(AttrSubscrDict):
             obj_map(self[k], pre=_app)
         return children
 
+    def ref(self):
+        return ref(self)
+
     def serial(self):
         def _tostr(o):
-            if o == self: return
+            if o is self: return
             if isinstance(o, Hobject):
                 return ref(o)
 

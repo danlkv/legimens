@@ -1,8 +1,12 @@
 import multiprocessing.dummy as thr
 from collections import defaultdict
 import trio
+import sys
 import json
 from loguru import logger as log
+log.remove()
+log.add(sys.stdout, level="INFO")
+
 
 from hosta import Hobject
 from hosta.Hobject import ref

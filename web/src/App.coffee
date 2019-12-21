@@ -36,11 +36,11 @@ export default class App extends Component
         type:'text',
         value: @state.value
         onChange:({target:value:value}) => @setState {value}
-      L_ Object,
-        addr:@state.value
-        refval:''
-        (data, setattr)->
-          change = (value)->
-            setattr 'value', value
-          L_ Greet, name:data, onChange:change
+      L_ Object, addr:@state.value, refval:'',
+        (data, setattr)=>
+          L_ Object, addr:@state.value, refval:data,
+            (data, setattr)->
+              change = (value)->
+                setattr 'value', value
+              L_ Greet, name:data, onChange:change
 
