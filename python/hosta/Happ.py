@@ -19,7 +19,7 @@ class Happ:
         self.port = port
         self.vars = Hobject()
         self._child_obj = {}
-        self._subscr = defaultdict(lambda: [], {})
+        self._subscr = defaultdict(list, {})
         self._cancel_scope = trio.CancelScope()
         self._running = True
 
@@ -29,7 +29,7 @@ class Happ:
         if isinstance(o, Hobject):
             o.subscribe_set(self._on_val_set)
             self._child_obj[ref(o)] = o
-            log.debug("Added child object {}", o)
+            log.debug("Added child object {} with ref {}", o, ref(o))
             # returning none makes mapper
             # traverse the whole dict tree 
             return None
@@ -46,9 +46,9 @@ class Happ:
         try:
             if hasattr(ws.remote, 'address'): ip = ws.remote.address
             else: ip = ws.remote
-            log.info(f"New connection of {ws.path} from {ip}")
-            log.debug(f"Children {self._child_obj.keys()}")
-            log.debug(f"Subscribers {self._subscr}")
+            log.info(f"New ws connection of {ws.path} from {ip}")
+            log.debug(f"Children objects: {self._child_obj.keys()}")
+            log.debug(f"Clients connected: {self._subscr}")
 
             refv = ws.path.split('/')[1]
             # if anything is in the path
@@ -58,6 +58,7 @@ class Happ:
 
             else:
                 # return link to root element
+                log.info(f"Sending root {ref(self.vars)}")
                 yield ref(self.vars)
         except Exception as e:
             log.error("Handling {} error:{}", type(e), e)
