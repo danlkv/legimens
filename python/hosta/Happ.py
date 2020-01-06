@@ -44,7 +44,9 @@ class Happ:
 
     async def _handler(self, ws):
         try:
-            log.info(f"New connection from {ws.path}")
+            if hasattr(ws.remote, 'address'): ip = ws.remote.address
+            else: ip = ws.remote
+            log.info(f"New connection of {ws.path} from {ip}")
             log.debug(f"Children {self._child_obj.keys()}")
             log.debug(f"Subscribers {self._subscr}")
 
