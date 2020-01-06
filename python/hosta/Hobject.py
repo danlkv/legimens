@@ -9,10 +9,13 @@ def ref(o):
 class Hobject(AttrSubscrDict):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        object.__setattr__(self, '_touched', True)
+        self._touch()
 
     def _set(self, name, value):
         super()._set(name, value)
+        self._touch()
+
+    def _touch(self):
         object.__setattr__(self, '_touched', True)
 
     def _mark_untouched(self):
