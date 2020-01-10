@@ -10,16 +10,16 @@ log.remove()
 log.add(sys.stdout, level="INFO")
 
 
-from hosta import Hobject
-from hosta.Hobject import ref
-from hosta.helpers.dictMap import obj_map
-from hosta.websocket.server import start_server
+from legimens import Object
+from legimens.Object import ref
+from legimens.helpers.dictMap import obj_map
+from legimens.websocket.server import start_server
 
-class Happ:
+class App:
     def __init__(self, addr, port):
         self.addr = addr
         self.port = port
-        self.vars = Hobject()
+        self.vars = Object()
         self._child_obj = {}
         self._subscr = defaultdict(list, {})
         self._cancel_scope = trio.CancelScope()
@@ -28,7 +28,7 @@ class Happ:
         self._on_val_set(None,self.vars)
 
     def _register_child(self, o):
-        if isinstance(o, Hobject):
+        if isinstance(o, Object):
             o.subscribe_set(self._on_val_set)
             self._child_obj[ref(o)] = o
             log.debug("Added child object {} with ref {}", o, ref(o))
