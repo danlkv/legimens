@@ -33,13 +33,15 @@ class Object(AttrSubscrDict):
     def ref(self):
         return ref(self)
 
-    def serial(self):
-        def _tostr(o):
-            if o is self: return
-            if isinstance(o, Object):
-                return ref(o)
+    def _before_send(self, name, value):
+        return name, value
 
-        x = obj_map(self, _tostr)
-        x = json.dumps(x)
-        return x
+def serial(obj):
+    def _tostr(o):
+        if isinstance(o, Object):
+            return ref(o)
+
+    x = obj_map(obj, _tostr)
+    x = json.dumps(x)
+    return x
 
