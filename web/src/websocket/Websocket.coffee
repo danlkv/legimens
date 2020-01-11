@@ -5,7 +5,7 @@ export default class WebSock extends Component
   state = {}
   constructor:(props) ->
     super(props)
-    console.log("constructor")
+    console.log 'websocket constructor', props
 
   _init_ws:({url, onOpen, onClose, onError})->
     @ws = new WebSocket url
@@ -21,6 +21,7 @@ export default class WebSock extends Component
     @ws.send message
 
   render:()->
+    # Handle updated props
     if @props.url != @ws?.url
       @ws?.close 1000
       @_init_ws @props
