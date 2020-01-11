@@ -2,16 +2,16 @@ import multiprocessing.dummy as thr
 from collections import defaultdict
 import trio
 import sys
-import gc
-import pprint
 import json
 from loguru import logger as log
 log.remove()
-log.add(sys.stdout, level="INFO")
+log.add(sys.stdout, level="DEBUG")
+import logging
+logging.basicConfig(level=logging.DEBUG)
 
 
 from legimens import Object
-from legimens.Object import ref
+from legimens.Object import ref, serial
 from legimens.helpers.dictMap import obj_map
 from legimens.websocket.server import start_server
 
@@ -21,48 +21,30 @@ class App:
         self.port = port
         self.vars = Object()
         self._child_obj = {}
+        self._children_updates = defaultdict(dict, {})
         self._subscr = defaultdict(list, {})
         self._cancel_scope = trio.CancelScope()
         self._running = True
 
-        self._on_val_set(None,self.vars)
+        self._register_child(self.vars)
 
     def _register_child(self, o):
         if isinstance(o, Object):
-            o.subscribe_set(self._on_val_set)
+            def put_updates(name, value):
+                """ Put the updates to temp dictionary """
+                name, value = o._before_send(name, value)
+                self._children_updates[ref(o)].update({name:value})
+            def register_new(name, value):
+                """ Make `Object` children of this Object also be listened """
+                obj_map(value, self._register_child)
+            o.subscribe_set(put_updates)
+            o.subscribe_set(register_new)
+
             self._child_obj[ref(o)] = o
             log.debug("Added child object {} with ref {}", o, ref(o))
             # returning none makes mapper
             # traverse the whole dict tree 
-            self._clean_children()
             return None
-    
-    def _on_val_set(self, name, value):
-        obj_map(value, self._register_child)
-
-    def _clean_children(self):
-        """ If one of our children in _child_obj has
-        only one referrer, this means that this object exists only
-        in _child_obj and thus is no longer needed by user
-
-        Note: this function is called  before actual set value.
-        This means that we will always have one object left
-        TODO: fix described above
-        """
-        refcnts = { k:gc.get_referrers(v) for k, v in self._child_obj.items() } 
-        refcnts = { k:(len(v)) for k, v in refcnts.items()}
-        log.debug(f"Children ref counts: {refcnts}")
-        to_delete = []
-        for k, v in refcnts.items():
-            if v<2:
-                to_delete.append(k)
-        log.debug(f"Children for deletion: {to_delete}")
-        for k in to_delete:
-            del self._child_obj[k]
-            del self._subscr[k]
-
-    def _ser_vars(self):
-        return json.dumps(self.vars)
 
 ## ## ## ## ## ## Listening updates ## ## ## ## ## ## 
 
@@ -71,7 +53,7 @@ class App:
             if hasattr(ws.remote, 'address'): ip = ws.remote.address
             else: ip = ws.remote
             log.info(f"New ws connection of {ws.path} from {ip}")
-            log.debug(f"Children objects: {self._child_obj.keys()}")
+            log.debug(f"Children objects: {self._children_updates.keys()}")
             log.debug(f"Clients connected: {self._subscr}")
 
             refv = ws.path.split('/')[1]
@@ -83,7 +65,7 @@ class App:
             else:
                 # return link to root element
                 log.info(f"Sending root {ref(self.vars)}")
-                yield ref(self.vars)
+                yield json.dumps({'root':ref(self.vars)})
         except Exception as e:
             log.error("Handling {} error:{}", type(e), e)
 
@@ -94,15 +76,18 @@ class App:
         child = self._child_obj[ref]
         # if updates to other clients sent, 
         # Initiate state for current cliet
-        if not child._touched:
-            log.info("Yield initial update")
-            yield child.serial()
+        if not self._children_updates[ref]:
+            x = {}
+            for name, value in child.items():
+                name, value = child._before_send(name, value)
+                x[name] = value
+            log.info("Yield initial update {}",x.keys())
+            x = serial(x)
+            yield x
 
         await self._child_updating_loop(ws, child)
 
         yield None
-        # save ws connection open
-        await trio.sleep_forever()
 
     async def _child_updating_loop(self, ws, child):
         log.debug("Listening for updates for {}", ref(child))
@@ -112,7 +97,6 @@ class App:
                 updates = json.loads(msg)
                 log.debug("Updates for {} : {}", ref(child), updates)
                 child.update( updates )
-                child._touched = True
             except json.JSONDecodeError:
                 log.error("JSON decode error: {}", msg)
 
@@ -122,25 +106,25 @@ class App:
         listeners  = self._subscr[ref]
         return [ ws for ws in listeners if not ws.closed]
 
-    async def _send_child_to_listeners(self, child, listeners):
-        message = child.serial()
+    async def _send_updates_to_listeners(self, ref, listeners):
+        updates = self._children_updates[ref]
+        if not updates: return
+        message = serial(updates)
         try:
             for ws in listeners:
                 await ws.send_message(message)
-            child._mark_untouched()
+                self._children_updates[ref] = {}
         except Exception as e:
             log.error("Error sending update to {}: {}", ws, e)
 
     async def _monitor_vars(self):
         while True:
-            for r in self._child_obj:
-                alive = self._get_alive_listeners(r)
-                self._subscr[r] = alive
-                listeners = alive
+            for ref_ in self._children_updates:
+                # Clean listeners that are dead
+                listeners = self._get_alive_listeners(ref_)
+                self._subscr[ref_] = listeners
                 if len(listeners) > 0:
-                    child = self._child_obj[r]
-                    if child._touched:
-                        await self._send_child_to_listeners(child, listeners)
+                    await self._send_updates_to_listeners(ref_, listeners)
 
             if not self._running:
                 self._cancel_scope.cancel()

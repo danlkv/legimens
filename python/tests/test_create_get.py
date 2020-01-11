@@ -3,6 +3,7 @@ import json
 import time
 from utils.websocket_client import send_iter_sync, send_iter
 from legimens import Object, App
+from legimens.Object import serial
 addr, port = '127.0.0.1', 8082
 
 def setup():
@@ -54,7 +55,7 @@ def test_create():
     time.sleep(.15)
     assert responses.qsize()==2
     for _ in range(2):
-        assert responses.get() == app.vars.serial()
+        assert responses.get() == serial(dict(app.vars))
 
     app.vars.title = 'Changed title'
     time.sleep(.05)
