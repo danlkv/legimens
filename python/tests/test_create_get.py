@@ -25,7 +25,7 @@ def setup():
     app.vars.title = 'Test'
     return app
 
-def test_create():
+def test_basic():
     responses = Queue()
 
     async def init(ws):
@@ -46,25 +46,29 @@ def test_create():
     p1 = Process(target=send_iter_sync, args=(f'ws://{addr}:{port}',init))
     p2 = Process(target=send_iter_sync, args=(f'ws://{addr}:{port}',init))
 
-    app.run()
-    time.sleep(.2)
+    try:
+        app.run()
+        time.sleep(.2)
 
-    p1.start()
-    p2.start()
+        p1.start()
+        p2.start()
 
-    time.sleep(.15)
-    assert responses.qsize()==2
-    for _ in range(2):
-        assert responses.get() == serial(dict(app.vars))
+        time.sleep(.15)
+        assert responses.qsize()==2
+        for _ in range(2):
+            assert responses.get() == serial(dict(app.vars))
 
-    app.vars.title = 'Changed title'
-    time.sleep(.05)
+        app.vars.title = 'Changed title'
+        time.sleep(.05)
 
-    assert responses.qsize()==2
-    for _ in range(2):
-        r = json.loads(responses.get())
-        assert r['title']  == app.vars.title
+        assert responses.qsize()==2
+        for _ in range(2):
+            r = json.loads(responses.get())
+            assert list(r.keys()) == ['title']
+            assert r['title']  == app.vars.title
 
-    app.stop()
-    p1.join()
-    p2.join()
+        app.stop()
+        p1.join()
+        p2.join()
+    finally:
+        app.stop()
