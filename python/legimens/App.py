@@ -53,7 +53,7 @@ class App:
             if hasattr(ws.remote, 'address'): ip = ws.remote.address
             else: ip = ws.remote
             log.info(f"New ws connection of {ws.path} from {ip}")
-            log.debug(f"Children objects: {self._children_updates.keys()}")
+            log.debug(f"Children objects: {self._child_obj.keys()}")
             log.debug(f"Clients connected: {self._subscr}")
 
             refv = ws.path.split('/')[1]
