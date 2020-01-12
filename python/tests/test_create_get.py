@@ -2,28 +2,16 @@ from multiprocessing import Process, Queue
 import json
 import time
 from utils.websocket_client import send_iter_sync, send_iter
-from legimens import Object, App
+from setup_app import setup_app
 from legimens.Object import serial
+from loguru import logger as log
+
 addr, port = '127.0.0.1', 8082
 
-def setup():
-    class User(Object):
-        def __init__(self, name, age):
-            super().__init__()
-            self.name = name
-            self.age = age
-    class Post(Object):
-        def __init__(self, title, comments=[]):
-            super().__init__()
-            self.title = title
-            self.comments = comments
-    u = User(name='John', age=30)
-    u.posts = [Post(title='Legi'), Post(title='Megi')]
-
-    app = App(addr=addr, port=port)
-    app.vars.users = [u, User(name='Mohn', age=10)]
-    app.vars.title = 'Test'
-    return app
+def listener_process(url, generator):
+    p = Process(target=log.catch(send_iter_sync), args=(url,generator))
+    p.daemon = True
+    return p
 
 def test_basic():
     responses = Queue()
@@ -42,13 +30,13 @@ def test_basic():
         yield None
         return
 
-    app = setup()
-    p1 = Process(target=send_iter_sync, args=(f'ws://{addr}:{port}',init))
-    p2 = Process(target=send_iter_sync, args=(f'ws://{addr}:{port}',init))
+    app = setup_app(addr, port)
+    p1 = listener_process(f'ws://{addr}:{port}', init)
+    p2 = listener_process(f'ws://{addr}:{port}', init)
 
     try:
         app.run()
-        time.sleep(.2)
+        time.sleep(.05)
 
         p1.start()
         p2.start()
@@ -67,8 +55,6 @@ def test_basic():
             assert list(r.keys()) == ['title']
             assert r['title']  == app.vars.title
 
-        app.stop()
-        p1.join()
-        p2.join()
     finally:
+        print(':: Stopping app ::')
         app.stop()
