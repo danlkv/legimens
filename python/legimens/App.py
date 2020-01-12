@@ -2,6 +2,7 @@ import multiprocessing.dummy as thr
 from collections import defaultdict
 import trio
 import sys
+import gc
 import json
 from loguru import logger as log
 log.remove()
@@ -30,13 +31,17 @@ class App:
 
     def _register_child(self, o):
         if isinstance(o, Object):
+
             def put_updates(name, value):
                 """ Put the updates to temp dictionary """
                 name, value = o._before_send(name, value)
                 self._children_updates[ref(o)].update({name:value})
+
             def register_new(name, value):
                 """ Make `Object` children of this Object also be listened """
                 obj_map(value, self._register_child)
+                self._clean_children()
+
             o.subscribe_set(put_updates)
             o.subscribe_set(register_new)
 
@@ -45,6 +50,28 @@ class App:
             # returning none makes mapper
             # traverse the whole dict tree 
             return None
+
+    def _clean_children(self):
+        """ If one of our children in _child_obj has
+        only one referrer, this means that this object exists only
+        in _child_obj and thus is no longer needed by user
+
+        Note: this function is called  before actual set value.
+        This means that we will always have one object left
+        TODO: fix described above
+        """
+        refcnts = { k:gc.get_referrers(v) for k, v in self._child_obj.items() } 
+        refcnts = { k:(len(v)) for k, v in refcnts.items()}
+        log.debug(f"Children ref counts: {refcnts}")
+        to_delete = []
+        for k, v in refcnts.items():
+            if v<2:
+                to_delete.append(k)
+        log.debug(f"Children for deletion: {to_delete}")
+        for k in to_delete:
+            del self._child_obj[k]
+            del self._subscr[k]
+            del self._children_updates[k]
 
 ## ## ## ## ## ## Listening updates ## ## ## ## ## ## 
 

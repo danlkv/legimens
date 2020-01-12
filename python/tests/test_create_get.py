@@ -30,7 +30,7 @@ def test_create():
 
     async def init(ws):
         msg = await ws.get_message()
-        root_id = msg
+        root_id = json.loads(msg)['root']
         print('<<<root_id<<<', root_id)
         async def root_iter(ws):
             while True:
