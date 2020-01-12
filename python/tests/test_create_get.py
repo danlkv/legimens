@@ -20,12 +20,14 @@ def test_basic():
         msg = await ws.get_message()
         root_id = json.loads(msg)['root']
         print('<<<root_id<<<', root_id)
+
         async def root_iter(ws):
             while True:
                 root = await ws.get_message()
                 print('<<<<root_obj<<<<<', root)
                 responses.put(root)
                 yield None
+
         await send_iter(f'ws://{addr}:{port}/{root_id}',root_iter)
         yield None
         return
