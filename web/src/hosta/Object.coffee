@@ -6,13 +6,10 @@ import Websocket from '../websocket/Websocket.coffee'
 export default class Object extends Component
   constructor:(props) ->
     super props
-    console.log 5
-    @name = @constructor.name
     @object_props = {}
 
   render: ->
     {refval, addr} = @props
-    console.log("object render",@props)
     url = addr + refval
     L_ Websocket, url:url, (data, update) =>
       setAttr = (attr, value) ->

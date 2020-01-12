@@ -2,11 +2,6 @@ import React, { Component } from 'react'
 import L from 'react-dom-factories'
 
 export default class WebSock extends Component
-  state = {}
-  constructor:(props) ->
-    super(props)
-    console.log 'websocket constructor', props
-
   _init_ws:({url, onOpen, onClose, onError})->
     @ws = new WebSocket url
     @ws.addEventListener 'message', @onMessage
