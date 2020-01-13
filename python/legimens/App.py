@@ -6,9 +6,7 @@ import gc
 import json
 from loguru import logger as log
 log.remove()
-log.add(sys.stdout, level="DEBUG")
-import logging
-logging.basicConfig(level=logging.DEBUG)
+log.add(sys.stdout, level="INFO")
 
 
 from legimens import Object
