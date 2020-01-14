@@ -15,6 +15,10 @@ export default class WebSock extends Component
   send: (message) =>
     @ws.send message
 
+  componentWillUnmount: ()=>
+    @ws.close()
+    @ws = null
+
   render:()->
     # Handle updated props
     if @props.url != @ws?.url
