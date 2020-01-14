@@ -10,10 +10,10 @@ class Object(AttrSubscrDict):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def _before_send(self, name, value):
-        return name, value
+    def _prepare_send(self, name, value):
+        return name, serial(value)
 
-    def _after_update(self, name, value):
+    def _commit_update(self, name, value):
         self[name] = value
 
     def _get_child_obj(self):
@@ -31,6 +31,6 @@ def serial(obj):
             return ref(o)
 
     x = obj_map(obj, _tostr)
-    x = json.dumps(x)
+    #x = json.dumps(x)
     return x
 

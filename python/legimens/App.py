@@ -10,7 +10,7 @@ log.add(sys.stdout, level="INFO")
 
 
 from legimens import Object
-from legimens.Object import ref, serial
+from legimens.Object import ref
 from legimens.helpers.dictMap import obj_map
 from legimens.websocket.server import start_server
 
@@ -32,7 +32,7 @@ class App:
 
             def put_updates(name, value):
                 """ Put the updates to temp dictionary """
-                name, value = o._before_send(name, value)
+                name, value = o._prepare_send(name, value)
                 self._children_updates[ref(o)].update({name:value})
 
             def register_new(name, value):
@@ -58,11 +58,11 @@ class App:
         This means that we will always have one object left
         TODO: fix described above
         """
-        refcnts = { k:gc.get_referrers(v) for k, v in self._child_obj.items() } 
+        refcnts = { k:len(gc.get_referrers(v)) for k, v in self._child_obj.items() } 
         log.debug(f"Children ref counts: {refcnts}")
         to_delete = []
         for k, v in refcnts.items():
-            if v<2:
+            if v < 2:
                 to_delete.append(k)
         log.debug(f"Children for deletion: {to_delete}")
         for k in to_delete:
@@ -103,11 +103,10 @@ class App:
         if not self._children_updates[ref]:
             x = {}
             for name, value in child.items():
-                name, value = child._before_send(name, value)
+                name, value = child._prepare_send(name, value)
                 x[name] = value
             log.info("Yield initial update {}",x.keys())
-            x = serial(x)
-            yield x
+            yield json.dumps(x)
 
         await self._child_updating_loop(ws, child)
 
@@ -121,7 +120,7 @@ class App:
                 updates = json.loads(msg)
                 log.debug("Updates for {} : {}", ref(child), updates)
                 for key, value in updates.items():
-                    child._after_update(key, value)
+                    child._commit_update(key, value)
             except json.JSONDecodeError:
                 log.error("JSON decode error: {}", msg)
 
@@ -134,7 +133,7 @@ class App:
     async def _send_updates_to_listeners(self, ref, listeners):
         updates = self._children_updates[ref]
         if not updates: return
-        message = serial(updates)
+        message = json.dumps(updates)
         try:
             for ws in listeners:
                 await ws.send_message(message)

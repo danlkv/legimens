@@ -46,7 +46,7 @@ def test_basic():
         time.sleep(.15)
         assert responses.qsize()==2
         for _ in range(2):
-            assert responses.get() == serial(dict(app.vars))
+            assert responses.get() == json.dumps(serial(dict(app.vars)))
 
         app.vars.title = 'Changed title'
         time.sleep(.05)
