@@ -9,17 +9,12 @@ def ref(o):
 class Object(AttrSubscrDict):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._touch()
 
-    def _set(self, name, value):
-        super()._set(name, value)
-        self._touch()
+    def _before_send(self, name, value):
+        return name, value
 
-    def _touch(self):
-        object.__setattr__(self, '_touched', True)
-
-    def _mark_untouched(self):
-        object.__setattr__(self, '_touched', False)
+    def _after_update(self, name, value):
+        self[name] = value
 
     def _get_child_obj(self):
         children = []
@@ -29,12 +24,6 @@ class Object(AttrSubscrDict):
         for k in self:
             obj_map(self[k], pre=_app)
         return children
-
-    def ref(self):
-        return ref(self)
-
-    def _before_send(self, name, value):
-        return name, value
 
 def serial(obj):
     def _tostr(o):

@@ -59,7 +59,6 @@ class App:
         TODO: fix described above
         """
         refcnts = { k:gc.get_referrers(v) for k, v in self._child_obj.items() } 
-        refcnts = { k:(len(v)) for k, v in refcnts.items()}
         log.debug(f"Children ref counts: {refcnts}")
         to_delete = []
         for k, v in refcnts.items():
@@ -121,7 +120,8 @@ class App:
             try:
                 updates = json.loads(msg)
                 log.debug("Updates for {} : {}", ref(child), updates)
-                child.update( updates )
+                for key, value in updates.items():
+                    child._after_update(key, value)
             except json.JSONDecodeError:
                 log.error("JSON decode error: {}", msg)
 
