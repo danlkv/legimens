@@ -10,6 +10,9 @@ class Object(AttrSubscrDict):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+    def _ref(self):
+        return ref(self)
+
     def _prepare_send(self, name, value):
         return name, serial(value)
 
