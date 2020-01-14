@@ -95,9 +95,14 @@ class App:
 
     async def _handle_obj_ref(self, ws, ref):
         # Subscribe this client to monitor vars
-        self._subscr[ref].append( ws )
         # send the current object to it
-        child = self._child_obj[ref]
+        child = self._child_obj.get(ref)
+        if child is None:
+            log.error("No child with ref {}", ref)
+            return
+
+        self._subscr[ref].append( ws )
+
         # if updates to other clients sent, 
         # Initiate state for current cliet
         if not self._children_updates[ref]:
