@@ -62,7 +62,7 @@ class App:
         log.debug(f"Children ref counts: {refcnts}")
         to_delete = []
         for k, v in refcnts.items():
-            if v <= 3:
+            if v <= 1:
                 to_delete.append(k)
         log.debug(f"Children for deletion: {to_delete}")
         for k in to_delete:
