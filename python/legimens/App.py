@@ -2,11 +2,11 @@ import multiprocessing.dummy as thr
 from collections import defaultdict
 import trio
 import sys
-import gc
+import weakref
 import json
 from loguru import logger as log
 log.remove()
-log.add(sys.stdout, level="INFO")
+log.add(sys.stdout, level="DEBUG")
 
 
 from legimens import Object
@@ -19,7 +19,7 @@ class App:
         self.addr = addr
         self.port = port
         self.vars = Object()
-        self._child_obj = {}
+        self._child_obj = weakref.WeakValueDictionary()
         self._children_updates = defaultdict(dict, {})
         self._subscr = defaultdict(list, {})
         self._cancel_scope = trio.CancelScope()
@@ -38,7 +38,6 @@ class App:
             def register_new(name, value):
                 """ Make `Object` children of this Object also be listened """
                 obj_map(value, self._register_child)
-                self._clean_children()
 
             o.subscribe_set(put_updates)
             o.subscribe_set(register_new)
@@ -48,27 +47,6 @@ class App:
             # returning none makes mapper
             # traverse the whole dict tree 
             return None
-
-    def _clean_children(self):
-        """ If one of our children in _child_obj has
-        only one referrer, this means that this object exists only
-        in _child_obj and thus is no longer needed by user
-
-        Note: this function is called  before actual set value.
-        This means that we will always have one object left
-        TODO: fix described above
-        """
-        refcnts = { k:len(gc.get_referrers(v)) for k, v in self._child_obj.items() } 
-        log.debug(f"Children ref counts: {refcnts}")
-        to_delete = []
-        for k, v in refcnts.items():
-            if v <= 1:
-                to_delete.append(k)
-        log.debug(f"Children for deletion: {to_delete}")
-        for k in to_delete:
-            del self._child_obj[k]
-            del self._subscr[k]
-            del self._children_updates[k]
 
 ## ## ## ## ## ## Listening updates ## ## ## ## ## ## 
 

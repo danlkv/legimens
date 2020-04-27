@@ -20,6 +20,7 @@ class Object(AttrSubscrDict):
         self[name] = value
 
     def _get_child_obj(self):
+        # TODO: not used, should I keep it?
         children = []
         def _app(o):
             if isinstance(o, Object):
