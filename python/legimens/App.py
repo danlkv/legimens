@@ -1,6 +1,7 @@
-import multiprocessing.dummy as thr
+from threading import Thread
 from collections import defaultdict
 import trio
+import time
 import sys
 import weakref
 import json
@@ -109,9 +110,17 @@ class App:
 
 ## ## ## ## ## ## Serving updates ## ## ## ## ## ## 
 
-    def _get_alive_listeners(self, ref):
-        listeners  = self._subscr[ref]
-        return [ ws for ws in listeners if not ws.closed]
+    async def _monitor_updates(self):
+        while True:
+            for ref_ in self._children_updates:
+                # Clean listeners that are dead
+                listeners = self._get_alive_listeners(ref_)
+                self._subscr[ref_] = listeners
+                if len(listeners) > 0:
+                    await self._send_updates_to_listeners(ref_, listeners)
+
+
+            await trio.sleep(.02)
 
     async def _send_updates_to_listeners(self, ref, listeners):
         updates = self._children_updates[ref]
@@ -124,40 +133,62 @@ class App:
         except Exception as e:
             log.error("Error sending update to {}: {}", ws, e)
 
-    async def _monitor_vars(self):
-        while True:
-            for ref_ in self._children_updates:
-                # Clean listeners that are dead
-                listeners = self._get_alive_listeners(ref_)
-                self._subscr[ref_] = listeners
-                if len(listeners) > 0:
-                    await self._send_updates_to_listeners(ref_, listeners)
-
-            if not self._running:
-                self._cancel_scope.cancel()
-
-            await trio.sleep(.02)
+    def _get_alive_listeners(self, ref):
+        listeners  = self._subscr[ref]
+        return [ ws for ws in listeners if not ws.closed]
 
 ## ## ## ## ## ## Starting ## ## ## ## ## ## 
 
     async def _start(self):
-        with self._cancel_scope:
-            args = (self.addr, self.port, self._handler)
+        args = (self.addr, self.port, self._handler)
+        try:
             async with trio.open_nursery() as nursery:
+                self._cancel_scope = nursery.cancel_scope
+                nursery.start_soon(self._watch_for_cancel)
                 nursery.start_soon(start_server, *args+(nursery,))
-                nursery.start_soon(self._monitor_vars)
+                nursery.start_soon(self._monitor_updates)
+        except Exception:
+            self._running = False
+            log.info("App crashed.")
+            raise
         log.info("App stopped")
 
     def run_sync(self):
         trio.run(self._start)
 
     def run(self):
-        t = thr.Process(target=trio.run, args=(self._start,))
+        t = Thread(target=trio.run, args=(self._start,))
         t.start()
+        time.sleep(.05)
+        if not self._running:
+            raise Exception("Failed to start Legimens")
         return t
 
 ## ## ## ## ## ## Stopping ## ## ## ## ## ## 
 
-    def stop(self):
-        self._running = False
+    async def _watch_for_cancel(self):
+        """
+        It's a good question how often we should
+        chef whether `stop()` was called. Use 0.2seconds for now
+        """
+        while True:
+            if not self._running:
+                log.debug("Cancelling trio scope")
+                self._cancel_scope.cancel()
+            await trio.sleep(.2)
 
+    def stop(self):
+        """ set `self._running` to False,
+        trio coro that runs in another thread will find it and call
+        `self._cancel_scope.cancel()`
+
+        To determine whether the main nursery was cancelled,
+        repeatedly checks for `self._cancel_scope.cancelled_caught`.
+        Shouldn't take more than 2seconds, otherwise is a bug
+        """
+        self._running = False
+        for _ in range(20):
+            time.sleep(.1)
+            if self._cancel_scope.cancelled_caught:
+                return
+        log.error("Stopping failed. This is probably a bug, please report it.")
