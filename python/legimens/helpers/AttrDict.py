@@ -9,15 +9,6 @@ class AttrDict(dict):
     def __setattr__(self,  name, value):
         self[name] = value
 
-
-class Methods:
-    def __init__(self, **kwargs):
-        for name in kwargs:
-            setattr(self, name, kwargs[name])
-            print(name, kwargs[name])
-
-#def AttrCbDict(*args, get_cb=print, set_cb=print, **kwargs):
-
 class AttrCbDict(AttrDict):
     def __getattr__(self, name):
         #object.__getattribute__(self, '__get')(name)
@@ -42,9 +33,9 @@ class AttrSubscrDict(AttrCbDict):
     def subscribe_set(self, subs):
         self._set_subscribers.append(subs)
 
+
     def _get(self, name):
         [x(name) for x in object.__getattribute__(self,'_get_subscribers')]
-
 
     def _set(self, name, value):
         [x(name, value) for x in object.__getattribute__(self,'_set_subscribers')]
