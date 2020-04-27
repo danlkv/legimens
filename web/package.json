@@ -1,7 +1,7 @@
 {
   "name": "legimens",
   "author": "Danil Lykov @danlkv (http://lykov.tech)", 
-  "version": "1.0.3",
+  "version": "1.0.8",
   "main": "lib/legimens.js",
   "license": "GPL-3.0-only",
   "scripts": {
@@ -9,6 +9,7 @@
     "dev": "webpack-dev-server",
     "build": "npm run clean && NODE_ENV=production webpack -p",
     "lib": "webpack -p --config webpack-lib.config.coffee",
+    "lib-dev": "webpack-dev-server -p --config webpack-lib.config.coffee",
     "clean": "rimraf ./dist/*"
   },
   "dependencies": {

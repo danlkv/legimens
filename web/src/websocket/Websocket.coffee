@@ -2,11 +2,6 @@ import React, { Component } from 'react'
 import L from 'react-dom-factories'
 
 export default class WebSock extends Component
-  state = {}
-  constructor:(props) ->
-    super(props)
-    console.log("constructor")
-
   _init_ws:({url, onOpen, onClose, onError})->
     @ws = new WebSocket url
     @ws.addEventListener 'message', @onMessage
@@ -20,7 +15,12 @@ export default class WebSock extends Component
   send: (message) =>
     @ws.send message
 
+  componentWillUnmount: ()=>
+    @ws.close()
+    @ws = null
+
   render:()->
+    # Handle updated props
     if @props.url != @ws?.url
       @ws?.close 1000
       @_init_ws @props

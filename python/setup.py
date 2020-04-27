@@ -1,13 +1,12 @@
-
 from setuptools import setup, find_packages
 
 setup(
-    name='hosta',
-    version='0.1',
+    name='legimens',
+    version='0.1.3',
     license='MIT',
 
     packages=find_packages(),
-    python_requires='>=3.7',
+    python_requires='>=3.6',
 
     install_requires = ['loguru'],
     setup_requires = ['pytest-runner'],

@@ -1,16 +1,16 @@
 # Build your apps fast!
 
 ```python
-import hosta
+import legimens
 
-class Candyshop(hosta.Object):
+class Candyshop(legimens.Object):
     def __init__(self, name):
         self.name = name
 
 shop = class Candyshop('Hello candies')
 
 
-app = hosta.app('localhost:7000')
+app = legimens.app('localhost:7000')
 app.host(shop)
 app.start()
 ```
@@ -18,7 +18,7 @@ app.start()
 And then use your objects right away:
 
 ```js
-import {Object} from 'hosta';
+import {Object} from 'legimens';
 
 export default class Candyshop extends Object {
     address = 'localhost:7000';
