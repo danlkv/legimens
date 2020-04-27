@@ -9,7 +9,7 @@ from loguru import logger as log
 addr, port = '127.0.0.1', 8082
 
 def listener_process(url, generator):
-    p = Process(target=log.catch(send_iter_sync), args=(url,generator))
+    p = Process(target=(send_iter_sync), args=(url,generator))
     p.daemon = True
     return p
 
