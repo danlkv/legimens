@@ -169,7 +169,7 @@ class App:
     async def _watch_for_cancel(self):
         """
         It's a good question how often we should
-        chef whether `stop()` was called. Use 0.2seconds for now
+        check whether `stop()` was called. Use 0.2seconds for now
         """
         while True:
             if not self._running:
