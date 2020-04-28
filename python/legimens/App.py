@@ -6,8 +6,11 @@ import sys
 import weakref
 import json
 from loguru import logger as log
+import logging
+logging.getLogger('trio-websocket').setLevel(logging.INFO)
+
 log.remove()
-log.add(sys.stdout, level="DEBUG")
+log.add(sys.stdout, level="INFO")
 
 
 from legimens import Object
@@ -21,12 +24,24 @@ class App:
         self.port = port
         self.vars = Object()
         self._child_obj = weakref.WeakValueDictionary()
-        self._children_updates = defaultdict(dict, {})
         self._subscr = defaultdict(list, {})
+
+        self._watched_children = weakref.WeakValueDictionary()
+        self._watch_poll_delay = 0.2
+        self._children_updates = defaultdict(dict, {})
+
         self._cancel_scope = trio.CancelScope()
         self._running = True
 
         self._register_child(self.vars)
+
+    def watch_obj(self, obj):
+        self._watched_children[ref(obj)] = obj
+        self._child_obj[ref(obj)] = obj
+
+    def _register_new(self, name, value):
+        """ Make `Object` children of this Object also be listened """
+        obj_map(value, self._register_child)
 
     def _register_child(self, o):
         if isinstance(o, Object):
@@ -34,15 +49,13 @@ class App:
             def put_updates(name, value):
                 """ Put the updates to temp dictionary """
                 name, value = o._prepare_send(name, value)
+                # Determines what to send to ws clients
                 self._children_updates[ref(o)].update({name:value})
 
-            def register_new(name, value):
-                """ Make `Object` children of this Object also be listened """
-                obj_map(value, self._register_child)
-
             o.subscribe_set(put_updates)
-            o.subscribe_set(register_new)
+            o.subscribe_set(self._register_new)
 
+            # Determines where to put received updates
             self._child_obj[ref(o)] = o
             log.debug("Added child object {} with ref {}", o, ref(o))
             # returning none makes mapper
@@ -56,7 +69,7 @@ class App:
             if hasattr(ws.remote, 'address'): ip = ws.remote.address
             else: ip = ws.remote
             log.info(f"New ws connection of {ws.path} from {ip}")
-            log.debug(f"Children objects: {self._child_obj.keys()}")
+            log.debug(f"Children objects refs: {list(self._child_obj.keys())}")
             log.debug(f"Clients connected: {self._subscr}")
 
             refv = ws.path.split('/')[1]
@@ -73,7 +86,7 @@ class App:
             log.error("Handling {} error:{}", type(e), e)
 
     async def _handle_obj_ref(self, ws, ref):
-        # Subscribe this client to monitor vars
+        # Subscribe this ws client to monitor vars
         # send the current object to it
         child = self._child_obj.get(ref)
         if child is None:
@@ -85,18 +98,28 @@ class App:
         # if updates to other clients sent, 
         # Initiate state for current cliet
         if not self._children_updates[ref]:
-            x = {}
-            for name, value in child.items():
-                name, value = child._prepare_send(name, value)
-                x[name] = value
+            x =  self._full_object_prepare(child)
             log.info("Yield initial update {}",x.keys())
             yield json.dumps(x)
 
+        # ?B: submit listening coro of this particular object to nursery
         await self._child_updating_loop(ws, child)
-
         yield None
 
+    def _full_object_prepare(self, obj):
+        x = {}
+        for name, value in obj.items():
+            name, value = obj._prepare_send(name, value)
+            x[name] = value
+        return x
+
     async def _child_updating_loop(self, ws, child):
+        """ Listen for incomming updates from websocket
+        and update the relevant child
+
+        This coroutine works N times, where N is number of
+        requested existing objects (from `self._child_obj`)
+        """
         log.debug("Listening for updates for {}", ref(child))
         while True:
             msg = await ws.get_message()
@@ -108,30 +131,41 @@ class App:
             except json.JSONDecodeError:
                 log.error("JSON decode error: {}", msg)
 
+
 ## ## ## ## ## ## Serving updates ## ## ## ## ## ## 
+
+    # ?A: Constantly serve all objects updates
+    async def _poll_objects(self):
+        while True:
+            for ref_ in self._watched_children:
+                updates = self._full_object_prepare(self._watched_children[ref_])
+                log.debug(f"Poller sending updates to {ref_}")
+                await self._send_updates_to_listeners(ref_, updates)
+            await trio.sleep(self._watch_poll_delay)
 
     async def _monitor_updates(self):
         while True:
             for ref_ in self._children_updates:
                 # Clean listeners that are dead
-                listeners = self._get_alive_listeners(ref_)
-                self._subscr[ref_] = listeners
-                if len(listeners) > 0:
-                    await self._send_updates_to_listeners(ref_, listeners)
-
-
+                updates = self._children_updates[ref_]
+                if updates:
+                    await self._send_updates_to_listeners(ref_, updates)
+                    self._children_updates[ref_] = {}
             await trio.sleep(.02)
 
-    async def _send_updates_to_listeners(self, ref, listeners):
-        updates = self._children_updates[ref]
-        if not updates: return
+    async def _send_updates_to_listeners(self, ref_, updates):
+        """Get listeners of ref and send them updates"""
+        listeners = self._get_alive_listeners(ref_)
+        self._subscr[ref_] = listeners
+        if not len(listeners):
+            return
         message = json.dumps(updates)
-        try:
-            for ws in listeners:
+        for ws in listeners:
+            try:
                 await ws.send_message(message)
-                self._children_updates[ref] = {}
-        except Exception as e:
-            log.error("Error sending update to {}: {}", ws, e)
+            except Exception as e:
+                log.error("Error sending update to {}: {}", ws, e)
+
 
     def _get_alive_listeners(self, ref):
         listeners  = self._subscr[ref]
@@ -147,6 +181,7 @@ class App:
                 nursery.start_soon(self._watch_for_cancel)
                 nursery.start_soon(start_server, *args+(nursery,))
                 nursery.start_soon(self._monitor_updates)
+                nursery.start_soon(self._poll_objects)
         except Exception:
             self._running = False
             log.info("App crashed.")

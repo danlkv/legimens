@@ -1,17 +1,12 @@
-from multiprocessing import Process, Queue
+from multiprocessing import Queue
 import json
 import time
-from utils.websocket_client import send_iter_sync, send_iter
+from utils.websocket_client import send_iter, listener_process
 from setup_app import setup_app_nested
 from legimens.Object import serial
 from loguru import logger as log
 
 addr, port = '127.0.0.1', 8082
-
-def listener_process(url, generator):
-    p = Process(target=(send_iter_sync), args=(url,generator))
-    p.daemon = True
-    return p
 
 def test_nested():
     responses = Queue()
