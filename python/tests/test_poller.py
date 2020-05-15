@@ -40,6 +40,7 @@ class LeClient:
     def connect(self, addr):
         self.addr = addr
         p1 = listener_process(addr, self._start_comm)
+        p1.start()
         return p1
 
 def test_simple_var_poll():
@@ -51,7 +52,9 @@ def test_simple_var_poll():
             responses.put(x)
         yield
 
-
+    app = App(addr=addr, port=port)
+    client = LeClient('value', listen_upd)
+    p1 = client.connect(f'ws://{addr}:{port}')
 
 def test_object_poll():
     responses = Queue()
@@ -64,12 +67,11 @@ def test_object_poll():
 
     app = App(addr=addr, port=port)
     client = LeClient('rapid_updated', listen_upd)
-    p1 = client.connect(f'ws://{addr}:{port}')
 
     try:
         app.run()
         time.sleep(.05)
-        p1.start()
+        _ = client.connect(f'ws://{addr}:{port}')
 
         class Rollin(Object):
             def __init__(self):
