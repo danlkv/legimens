@@ -35,6 +35,9 @@ class App:
 
         self._register_child(self.vars)
 
+    def serialize_value(self, value):
+        return str(value)
+
     def watch_obj(self, obj):
         self._watched_children[ref(obj)] = obj
         self._child_obj[ref(obj)] = obj
@@ -99,19 +102,24 @@ class App:
         # Initiate state for current cliet
         if not self._children_updates[ref]:
             x =  self._full_object_prepare(child)
-            log.info("Yield initial update {}",x.keys())
-            yield json.dumps(x)
+            log.info("Yield initial update {}",x)
+            yield x
 
         # ?B: submit listening coro of this particular object to nursery
         await self._child_updating_loop(ws, child)
         yield None
 
     def _full_object_prepare(self, obj):
-        x = {}
-        for name, value in obj.items():
-            name, value = obj._prepare_send(name, value)
-            x[name] = value
-        return x
+        if isinstance(obj, Object):
+            x = {}
+            for name, value in obj.items():
+                name, value = obj._prepare_send(name, value)
+                x[name] = value
+            x = json.dumps(x)
+            return x
+        else:
+            return self.serialize_value(obj)
+
 
     async def _child_updating_loop(self, ws, child):
         """ Listen for incomming updates from websocket
@@ -138,28 +146,28 @@ class App:
     async def _poll_objects(self):
         while True:
             for ref_ in self._watched_children:
-                updates = self._full_object_prepare(self._watched_children[ref_])
+                message = self._full_object_prepare(self._watched_children[ref_])
                 log.debug(f"Poller sending updates to {ref_}")
-                await self._send_updates_to_listeners(ref_, updates)
+                await self._send_message_to_listeners(ref_, message)
             await trio.sleep(self._watch_poll_delay)
 
     async def _monitor_updates(self):
         while True:
             for ref_ in self._children_updates:
-                # Clean listeners that are dead
+                # __setattr__ hooks will put updates here
                 updates = self._children_updates[ref_]
                 if updates:
-                    await self._send_updates_to_listeners(ref_, updates)
+                    message = json.dumps(updates)
+                    await self._send_message_to_listeners(ref_, message)
                     self._children_updates[ref_] = {}
             await trio.sleep(.02)
 
-    async def _send_updates_to_listeners(self, ref_, updates):
+    async def _send_message_to_listeners(self, ref_, message):
         """Get listeners of ref and send them updates"""
         listeners = self._get_alive_listeners(ref_)
         self._subscr[ref_] = listeners
         if not len(listeners):
             return
-        message = json.dumps(updates)
         for ws in listeners:
             try:
                 await ws.send_message(message)

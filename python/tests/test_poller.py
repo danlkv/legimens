@@ -48,13 +48,33 @@ def test_simple_var_poll():
 
     async def listen_upd(ws):
         while True:
-            x = json.loads(await ws.get_message())
+            x = await ws.get_message()
             responses.put(x)
         yield
 
     app = App(addr=addr, port=port)
     client = LeClient('value', listen_upd)
-    p1 = client.connect(f'ws://{addr}:{port}')
+    try:
+        app.run()
+        time.sleep(.05)
+        class List(list):
+            pass
+        object = List()
+        app.watch_obj(object)
+        app.vars.value = ref(object)
+        _ = client.connect(f'ws://{addr}:{port}')
+        for i in range(5):
+            object.append(i)
+            time.sleep(.1)
+
+        time.sleep(.1)
+        assert responses.qsize()>0
+        responses = [responses.get() for _ in range(responses.qsize())]
+        assert responses[-1] == str(object)
+
+    finally:
+        app.stop()
+
 
 def test_object_poll():
     responses = Queue()
@@ -87,6 +107,7 @@ def test_object_poll():
         # Put data in bursts, use N appends between sleeps
         N = int(0.005/dt)
         app._watch_poll_delay = 0.1
+        # _ = client.connect(f'ws://{addr}:{port}')
         for i in range(int(T//dt)):
             rapid.x += [i]
             if i%N==0:
@@ -111,4 +132,3 @@ def test_object_poll():
     finally:
         app.stop()
 
-test_object_poll()
