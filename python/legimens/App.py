@@ -148,7 +148,7 @@ class App:
             for ref_ in self._watched_children:
                 message = self._full_object_prepare(self._watched_children[ref_])
                 log.debug(f"Poller sending updates to {ref_}")
-                await self._send_message_to_listeners(ref_, message)
+                await self._send_message_to_subscribers(ref_, message)
             await trio.sleep(self._watch_poll_delay)
 
     async def _monitor_updates(self):
@@ -158,26 +158,26 @@ class App:
                 updates = self._children_updates[ref_]
                 if updates:
                     message = json.dumps(updates)
-                    await self._send_message_to_listeners(ref_, message)
+                    await self._send_message_to_subscribers(ref_, message)
                     self._children_updates[ref_] = {}
             await trio.sleep(.02)
 
-    async def _send_message_to_listeners(self, ref_, message):
-        """Get listeners of ref and send them updates"""
-        listeners = self._get_alive_listeners(ref_)
-        self._subscr[ref_] = listeners
-        if not len(listeners):
+    async def _send_message_to_subscribers(self, ref_, message):
+        """Get subscribers of ref and send them updates"""
+        subscribers = self._get_alive_subscribers(ref_)
+        self._subscr[ref_] = subscribers
+        if not len(subscribers):
             return
-        for ws in listeners:
+        for ws in subscribers:
             try:
                 await ws.send_message(message)
             except Exception as e:
                 log.error("Error sending update to {}: {}", ws, e)
 
 
-    def _get_alive_listeners(self, ref):
-        listeners  = self._subscr[ref]
-        return [ ws for ws in listeners if not ws.closed]
+    def _get_alive_subscribers(self, ref):
+        subscribers  = self._subscr[ref]
+        return [ ws for ws in subscribers if not ws.closed]
 
 ## ## ## ## ## ## Starting ## ## ## ## ## ## 
 
