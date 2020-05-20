@@ -31,7 +31,9 @@ class App:
         self._children_updates = defaultdict(dict, {})
 
         self._cancel_scope = trio.CancelScope()
-        self._running = True
+        self._running = False
+
+        self._sleep_func = trio.sleep
 
         self._register_child(self.vars)
 
@@ -149,7 +151,7 @@ class App:
                 message = self._full_object_prepare(self._watched_children[ref_])
                 log.debug(f"Poller sending updates to {ref_}")
                 await self._send_message_to_subscribers(ref_, message)
-            await trio.sleep(self._watch_poll_delay)
+            await self._sleep_func(self._watch_poll_delay)
 
     async def _monitor_updates(self):
         while True:
@@ -160,7 +162,7 @@ class App:
                     message = json.dumps(updates)
                     await self._send_message_to_subscribers(ref_, message)
                     self._children_updates[ref_] = {}
-            await trio.sleep(.02)
+            await self._sleep_func(.02)
 
     async def _send_message_to_subscribers(self, ref_, message):
         """Get subscribers of ref and send them updates"""
@@ -190,6 +192,7 @@ class App:
                 nursery.start_soon(start_server, *args+(nursery,))
                 nursery.start_soon(self._monitor_updates)
                 nursery.start_soon(self._poll_objects)
+                self._running = True
         except Exception:
             self._running = False
             log.info("App crashed.")
@@ -204,7 +207,7 @@ class App:
         t.start()
         time.sleep(.05)
         if not self._running:
-            raise Exception("Failed to start Legimens")
+            raise Exception("Failed to start Legimens. Reason may be printed above by other thread. Exception sharing is under development.")
         return t
 
 ## ## ## ## ## ## Stopping ## ## ## ## ## ## 
@@ -229,6 +232,10 @@ class App:
         repeatedly checks for `self._cancel_scope.cancelled_caught`.
         Shouldn't take more than 2seconds, otherwise is a bug
         """
+        if self._running is False:
+            log.warning('Tried to stop, but wasn\'t running')
+            return 
+
         self._running = False
         for _ in range(20):
             time.sleep(.1)
