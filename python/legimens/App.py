@@ -153,15 +153,39 @@ class App:
                 await self._send_message_to_subscribers(ref_, message)
             await self._sleep_func(self._watch_poll_delay)
 
+    async def _wip_monitor_updates_balanced(self):
+        """
+        The idea is to start a small coroutine for every object update.
+        This will ensure a large update will not block other 
+        small and frequent updates 
+        """
+        while True:
+            for ref_, updates in self._children_updates.items():
+                if updates:
+                    async def itersend():
+                        while self._children_updates[ref_]:
+                            message = json.dumps(updates)
+                            await self._send_message_to_subscribers(ref, message)
+                    self.nursery.start_soon(itersend)
+
+
     async def _monitor_updates(self):
         while True:
             for ref_ in self._children_updates:
                 # __setattr__ hooks will put updates here
                 updates = self._children_updates[ref_]
                 if updates:
-                    message = json.dumps(updates)
-                    await self._send_message_to_subscribers(ref_, message)
+                    # Note that if reset updates after send, 
+                    # updates put while sending will be lost
                     self._children_updates[ref_] = {}
+                    message = json.dumps(updates)
+                    try:
+                        await self._send_message_to_subscribers(ref_, message)
+                    except:
+                        # We failed to send updates. save them anyway, but owerwrite 
+                        # if keys changed when we were sending
+                        with_failed = updates.update(self._children_updates[ref_])
+                        self._children_updates[ref_] = with_failed
             await self._sleep_func(.02)
 
     async def _send_message_to_subscribers(self, ref_, message):
