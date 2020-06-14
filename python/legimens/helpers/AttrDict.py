@@ -30,6 +30,8 @@ class AttrCbDict(AttrDict):
         At start, this was 1. Then I changed it to 2 to fix
         the bug with setting new value -
         set callback was set to sending updates, that were not in object yet
+        then changed to 1 back
+        and then back to 2
 
         """
 
