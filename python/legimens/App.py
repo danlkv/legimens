@@ -69,7 +69,7 @@ class App:
 
 ## ## ## ## ## ## Listening updates ## ## ## ## ## ## 
 
-    async def _handler(self, ws):
+    async def _ws_conn_handler(self, ws):
         try:
             if hasattr(ws.remote, 'address'): ip = ws.remote.address
             else: ip = ws.remote
@@ -208,12 +208,13 @@ class App:
 ## ## ## ## ## ## Starting ## ## ## ## ## ## 
 
     async def _start(self):
-        args = (self.addr, self.port, self._handler)
+        args_to_ws = (self.addr, self.port, self._ws_conn_handler)
         try:
             async with trio.open_nursery() as nursery:
                 self._cancel_scope = nursery.cancel_scope
                 nursery.start_soon(self._watch_for_cancel)
-                nursery.start_soon(start_server, *args+(nursery,))
+                nursery.start_soon(start_server, *args_to_ws+(nursery,))
+
                 nursery.start_soon(self._monitor_updates)
                 nursery.start_soon(self._poll_objects)
                 self._running = True

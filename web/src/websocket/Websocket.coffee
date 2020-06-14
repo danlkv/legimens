@@ -25,7 +25,3 @@ export default class WebSock extends Component
       @ws?.close 1000
       @_init_ws @props
     @props.children @state?.message.data, @send
-
-
-
-

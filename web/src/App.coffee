@@ -1,6 +1,6 @@
 import React, { Component } from 'react'
 import L from 'react-dom-factories'
-import Object from './hosta/Object.coffee'
+import Object from './legimens/Object.coffee'
 import Websocket from './websocket/Websocket.coffee'
 L_ = React.createElement
 import './App.less'

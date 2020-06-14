@@ -2,7 +2,7 @@ path = require 'path'
 
 module.exports =
   entry:
-    hosta: './src/legimens.coffee'
+    legimens: './src/legimens.coffee'
   output:
     filename: 'legimens.js'
     path: path.resolve(__dirname, 'lib')
