@@ -31,9 +31,14 @@ class App:
         self._children_updates = defaultdict(dict, {})
 
         self._cancel_scope = trio.CancelScope()
-        self._running = True
+        self._running = False
+
+        self._sleep_func = trio.sleep
 
         self._register_child(self.vars)
+
+    def serialize_value(self, value):
+        return str(value)
 
     def watch_obj(self, obj):
         self._watched_children[ref(obj)] = obj
@@ -64,7 +69,7 @@ class App:
 
 ## ## ## ## ## ## Listening updates ## ## ## ## ## ## 
 
-    async def _handler(self, ws):
+    async def _ws_conn_handler(self, ws):
         try:
             if hasattr(ws.remote, 'address'): ip = ws.remote.address
             else: ip = ws.remote
@@ -99,19 +104,24 @@ class App:
         # Initiate state for current cliet
         if not self._children_updates[ref]:
             x =  self._full_object_prepare(child)
-            log.info("Yield initial update {}",x.keys())
-            yield json.dumps(x)
+            log.info("Yield initial update {}",x)
+            yield x
 
         # ?B: submit listening coro of this particular object to nursery
         await self._child_updating_loop(ws, child)
         yield None
 
     def _full_object_prepare(self, obj):
-        x = {}
-        for name, value in obj.items():
-            name, value = obj._prepare_send(name, value)
-            x[name] = value
-        return x
+        if isinstance(obj, Object):
+            x = {}
+            for name, value in obj.items():
+                name, value = obj._prepare_send(name, value)
+                x[name] = value
+            x = json.dumps(x)
+            return x
+        else:
+            return self.serialize_value(obj)
+
 
     async def _child_updating_loop(self, ws, child):
         """ Listen for incomming updates from websocket
@@ -138,50 +148,76 @@ class App:
     async def _poll_objects(self):
         while True:
             for ref_ in self._watched_children:
-                updates = self._full_object_prepare(self._watched_children[ref_])
+                message = self._full_object_prepare(self._watched_children[ref_])
                 log.debug(f"Poller sending updates to {ref_}")
-                await self._send_updates_to_listeners(ref_, updates)
-            await trio.sleep(self._watch_poll_delay)
+                await self._send_message_to_subscribers(ref_, message)
+            await self._sleep_func(self._watch_poll_delay)
+
+    async def _wip_monitor_updates_balanced(self):
+        """
+        The idea is to start a small coroutine for every object update.
+        This will ensure a large update will not block other 
+        small and frequent updates 
+        """
+        while True:
+            for ref_, updates in self._children_updates.items():
+                if updates:
+                    async def itersend():
+                        while self._children_updates[ref_]:
+                            message = json.dumps(updates)
+                            await self._send_message_to_subscribers(ref, message)
+                    self.nursery.start_soon(itersend)
+
 
     async def _monitor_updates(self):
         while True:
             for ref_ in self._children_updates:
-                # Clean listeners that are dead
+                # __setattr__ hooks will put updates here
                 updates = self._children_updates[ref_]
                 if updates:
-                    await self._send_updates_to_listeners(ref_, updates)
+                    # Note that if reset updates after send, 
+                    # updates put while sending will be lost
                     self._children_updates[ref_] = {}
-            await trio.sleep(.02)
+                    message = json.dumps(updates)
+                    try:
+                        await self._send_message_to_subscribers(ref_, message)
+                    except:
+                        # We failed to send updates. save them anyway, but owerwrite 
+                        # if keys changed when we were sending
+                        with_failed = updates.update(self._children_updates[ref_])
+                        self._children_updates[ref_] = with_failed
+            await self._sleep_func(.02)
 
-    async def _send_updates_to_listeners(self, ref_, updates):
-        """Get listeners of ref and send them updates"""
-        listeners = self._get_alive_listeners(ref_)
-        self._subscr[ref_] = listeners
-        if not len(listeners):
+    async def _send_message_to_subscribers(self, ref_, message):
+        """Get subscribers of ref and send them updates"""
+        subscribers = self._get_alive_subscribers(ref_)
+        self._subscr[ref_] = subscribers
+        if not len(subscribers):
             return
-        message = json.dumps(updates)
-        for ws in listeners:
+        for ws in subscribers:
             try:
                 await ws.send_message(message)
             except Exception as e:
                 log.error("Error sending update to {}: {}", ws, e)
 
 
-    def _get_alive_listeners(self, ref):
-        listeners  = self._subscr[ref]
-        return [ ws for ws in listeners if not ws.closed]
+    def _get_alive_subscribers(self, ref):
+        subscribers  = self._subscr[ref]
+        return [ ws for ws in subscribers if not ws.closed]
 
 ## ## ## ## ## ## Starting ## ## ## ## ## ## 
 
     async def _start(self):
-        args = (self.addr, self.port, self._handler)
+        args_to_ws = (self.addr, self.port, self._ws_conn_handler)
         try:
             async with trio.open_nursery() as nursery:
                 self._cancel_scope = nursery.cancel_scope
                 nursery.start_soon(self._watch_for_cancel)
-                nursery.start_soon(start_server, *args+(nursery,))
+                nursery.start_soon(start_server, *args_to_ws+(nursery,))
+
                 nursery.start_soon(self._monitor_updates)
                 nursery.start_soon(self._poll_objects)
+                self._running = True
         except Exception:
             self._running = False
             log.info("App crashed.")
@@ -196,7 +232,7 @@ class App:
         t.start()
         time.sleep(.05)
         if not self._running:
-            raise Exception("Failed to start Legimens")
+            raise Exception("Failed to start Legimens. Reason may be printed above by other thread. Exception sharing is under development.")
         return t
 
 ## ## ## ## ## ## Stopping ## ## ## ## ## ## 
@@ -221,6 +257,10 @@ class App:
         repeatedly checks for `self._cancel_scope.cancelled_caught`.
         Shouldn't take more than 2seconds, otherwise is a bug
         """
+        if self._running is False:
+            log.warning('Tried to stop, but wasn\'t running')
+            return 
+
         self._running = False
         for _ in range(20):
             time.sleep(.1)

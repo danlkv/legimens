@@ -8,9 +8,16 @@ export default class Object extends Component
     super props
     @object_props = {}
 
-  render: ->
+  get_url:()->
     {refval, addr} = @props
+    [..., last] = addr
+    if last!='/'
+      addr = addr + '/'
     url = addr + refval
+    url
+
+  render: ->
+    url = @get_url()
     L_ Websocket, url:url, (data, update) =>
       setAttr = (attr, value) ->
         update JSON.stringify [attr]:value

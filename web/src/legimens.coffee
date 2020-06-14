@@ -1,3 +1,3 @@
-import Object from './hosta/Object.coffee'
+import Object from './legimens/Object.coffee'
 export default Object
 
