@@ -7,10 +7,12 @@ import weakref
 import json
 from loguru import logger as log
 import logging
+
 logging.getLogger('trio-websocket').setLevel(logging.INFO)
 
-log.remove()
-log.add(sys.stdout, level="INFO")
+def log_config(level):
+    log.remove()
+    log.add(sys.stderr, level=level)
 
 
 from legimens import Object
@@ -20,9 +22,10 @@ from legimens.websocket.server import start_server
 from legimens.websocket.server import ConnectionClosed
 
 class App:
-    def __init__(self, addr, port):
+    def __init__(self, addr, port, log_level='INFO'):
         self.addr = addr
         self.port = port
+        log_config(log_level)
         self.vars = Object()
         self._child_obj = weakref.WeakValueDictionary()
         self._subscr = defaultdict(list, {})
@@ -209,6 +212,7 @@ class App:
             return
         for ws in subscribers:
             try:
+                log.trace('Sending to {} about {} \n\t>{:85.85}<',  ref_, ws.remote.address, message)
                 await ws.send_message(message)
             except Exception as e:
                 log.error("Error sending update to {}: {}", ws, e)
@@ -235,7 +239,9 @@ class App:
                 self._running = True
                 while True:
                     for coro in self._coroutines_to_start:
+                        log.debug('Starting coroutine {}', coro)
                         nursery.start_soon(coro)
+                    self._coroutines_to_start.clear()
                     await trio.sleep(.3)
         except Exception:
             self._running = False

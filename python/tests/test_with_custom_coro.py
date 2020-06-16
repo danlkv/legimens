@@ -4,13 +4,6 @@ from multiprocessing import Queue
 from legimens import Object, App
 from legimens.Object import ref
 
-# - logging config
-import sys
-from loguru import logger as log
-log.remove()
-log.add(sys.stderr, level='TRACE')
-# -
-
 import trio
 
 from utils.websocket_client import send_iter, listener_process
@@ -63,23 +56,23 @@ class LeClient:
 
 
 def test_with_coro__resetting():
-
-    app = App(addr=addr, port=port)
+    app = App(addr=addr, port=port, log_level='TRACE')
     client = LeClient('value')
     try:
         app.run()
         time.sleep(.05)
         object = []
         async def watch():
-            app.vars.value = object
-            await trio.sleep(.05)
+            while True:
+                app.vars.value = object
+                await trio.sleep(.05)
         app.add_coroutine(watch)
 
         app.vars.value = object
         _ = client.start(f'ws://{addr}:{port}')
-        for i in range(5):
+        for i in range(20):
             object.append(i)
-            time.sleep(.1)
+            time.sleep(.02)
 
         time.sleep(.1)
 
