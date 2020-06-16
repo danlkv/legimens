@@ -26,6 +26,7 @@ class App:
         self.vars = Object()
         self._child_obj = weakref.WeakValueDictionary()
         self._subscr = defaultdict(list, {})
+        self._coroutines_to_start = []
 
         self._watched_children = weakref.WeakValueDictionary()
         self._watch_poll_delay = 0.2
@@ -223,18 +224,27 @@ class App:
         args_to_ws = (self.addr, self.port, self._ws_conn_handler)
         try:
             async with trio.open_nursery() as nursery:
+                self.nursery = nursery
                 self._cancel_scope = nursery.cancel_scope
                 nursery.start_soon(self._watch_for_cancel)
                 nursery.start_soon(start_server, *args_to_ws+(nursery,))
 
                 nursery.start_soon(self._monitor_updates)
                 nursery.start_soon(self._poll_objects)
+
                 self._running = True
+                while True:
+                    for coro in self._coroutines_to_start:
+                        nursery.start_soon(coro)
+                    await trio.sleep(.3)
         except Exception:
             self._running = False
             log.info("App crashed.")
             raise
         log.info("App stopped")
+
+    def add_coroutine(self, coro, *args):
+        self._coroutines_to_start.append(coro)
 
     def run_sync(self):
         trio.run(self._start)
