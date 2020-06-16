@@ -54,7 +54,7 @@ def test_nested():
         p1.start()
         p2.start()
 
-        time.sleep(.2)
+        time.sleep(.4)
         assert responses.qsize()==4
         for _ in range(2):
             assert responses.get() == json.dumps(serial(dict(app.vars)))
