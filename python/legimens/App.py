@@ -17,6 +17,7 @@ from legimens import Object
 from legimens.Object import ref
 from legimens.helpers.dictMap import obj_map
 from legimens.websocket.server import start_server
+from legimens.websocket.server import ConnectionClosed
 
 class App:
     def __init__(self, addr, port):
@@ -73,9 +74,9 @@ class App:
         try:
             if hasattr(ws.remote, 'address'): ip = ws.remote.address
             else: ip = ws.remote
-            log.info(f"New ws connection of {ws.path} from {ip}")
-            log.debug(f"Children objects refs: {list(self._child_obj.keys())}")
-            log.debug(f"Clients connected: {self._subscr}")
+            log.info("New ws connection to {} from {}", ws.path, ip)
+            log.debug("Children objects refs: {}", list(self._child_obj.keys()))
+            log.debug("Clients connected: {}", self._subscr)
 
             refv = ws.path.split('/')[1]
             # if anything is in the path
@@ -85,10 +86,17 @@ class App:
 
             else:
                 # return link to root element
-                log.info(f"Sending root {ref(self.vars)}")
-                yield json.dumps({'root':ref(self.vars)})
+                log.info("Sending root {}", ref(self.vars))
+                yield json.dumps({'root': ref(self.vars)})
+        except ConnectionClosed as e:
+            code = e.reason.code
+            if code == 1000:
+                log.info('Client {} goes away from {}', ip, ws.path)
+            else:
+                log.warning('Connection from {} to {} closed: {}.',
+                                             ip, ws.path,     e)
         except Exception as e:
-            log.error("Handling {} error:{}", type(e), e)
+            log.error("Handling {} error: {}", type(e), e)
 
     async def _handle_obj_ref(self, ws, ref):
         # Subscribe this ws client to monitor vars
@@ -137,7 +145,11 @@ class App:
                 updates = json.loads(msg)
                 log.debug("Updates for {} : {}", ref(child), updates)
                 for key, value in updates.items():
-                    child._commit_update(key, value)
+                    try:
+                        child._commit_update(key, value)
+                    except Exception as e:
+                        log.error(f"{e}. While commiting update to {child}.  "
+                                  f"{key} : {value}")
             except json.JSONDecodeError:
                 log.error("JSON decode error: {}", msg)
 
