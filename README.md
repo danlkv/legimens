@@ -1,7 +1,14 @@
-# Build your apps fast!
+
+![Test](https://github.com/DaniloZZZ/legimens/workflows/Test/badge.svg?branch=master)
+
+legimens watches for python objects in background and synchronizes
+them with remote.
+
+# Basic usage
 
 ```python
 import legimens
+app = legimens.App('localhost', 7000)
 
 class Candyshop(legimens.Object):
     def __init__(self, name):
@@ -10,23 +17,27 @@ class Candyshop(legimens.Object):
 shop = class Candyshop('Hello candies')
 
 
-app = legimens.app('localhost:7000')
-app.host(shop)
+app.vars.candyshop = shop
 app.start()
 ```
 
 And then use your objects right away:
 
-```js
-import {Object} from 'legimens';
 
-export default class Candyshop extends Object {
-    address = 'localhost:7000';
+```js
+import React, { Component } from 'react'
+import Object from 'legimens';
+
+export default class Candyshop extends Component {
+    url = 'ws://localhost:7000';
     render() {
         return (
-        <div>
-            <h1>Hello, welcome to {this.props.name}!</h1>
-            <h2>Want some candies?</h2>
-        </div>
+        <Object url={this.url}>
+            {(data, set_data) => {
+
+                <h1>Hello, welcome to {data.name}!</h1>
+                <h2>Want some candies?</h2>
+            }
+        </Object>
         )
 ```
