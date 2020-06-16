@@ -32,6 +32,7 @@ def test_nested():
                 root = await ws.get_message()
                 responses.put(root)
                 print('<<<<root_obj<<<<<', root)
+                time.sleep(.02)
                 if i==0:
                     root = json.loads(root)
                     user_ref = root['users'][0]
