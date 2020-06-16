@@ -10,9 +10,9 @@ import logging
 
 logging.getLogger('trio-websocket').setLevel(logging.INFO)
 
-def log_config(level):
+def log_config(level, colorize=True):
     log.remove()
-    log.add(sys.stderr, level=level)
+    log.add(sys.stderr, level=level, colorize=colorize)
 
 
 from legimens import Object
