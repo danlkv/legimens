@@ -26,4 +26,6 @@ jobs:
     - name: Run a multi-line script
       run: |
         cd python/
+        pip install .
+        pip install pytest
         pytest -srA
