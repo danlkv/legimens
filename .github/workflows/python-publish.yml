@@ -33,6 +33,6 @@ jobs:
       
     - name: Publish distribution to PyPI
       uses: pypa/gh-action-pypi-publish@master  
-      packages_dir: python/dist
       with:
         password: ${{ secrets.pypi_token }}
+        packages_dir: python/dist
