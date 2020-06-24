@@ -16,18 +16,13 @@ implicit watching funcitonality.
             self.value = value
 
     N = 100
+    print('Ids of vars:')
     for i in range(N):
-        print(id(i))
+        print(id(i), end=', ')
         app.vars.mamba = Int(i)
 
     assert len(list(app._child_obj.keys())) < N+1
+    assert len(list(app._child_obj.keys())) > 3
     gc.collect()
     assert len(list(app._child_obj.keys())) == 2
 
-def test_leak_in_children():
-    """
-integrated functionality
-
-    Adding many (N) objects and getting updates should not reult in mayn keys in updates.
-    """
-    pass
