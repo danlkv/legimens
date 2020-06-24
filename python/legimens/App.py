@@ -105,23 +105,29 @@ class App:
     async def _handle_obj_ref(self, ws, ref):
         # Subscribe this ws client to monitor vars
         # send the current object to it
-        child = self._child_obj.get(ref)
-        if child is None:
-            log.error("No child with ref {}", ref)
-            return
+        try:
+            child = self._child_obj.get(ref)
+            if child is None:
+                log.error("No child with ref {}", ref)
+                return
 
-        self._subscr[ref].append( ws )
+            self._subscr[ref].append( ws )
 
-        # if updates to other clients sent, 
-        # Initiate state for current cliet
-        if not self._children_updates[ref]:
-            x =  self._full_object_prepare(child)
-            log.info("Yield initial update {}",x)
-            yield x
+            # if updates to other clients sent, 
+            # Initiate state for current cliet
+            if not self._children_updates[ref]:
+                x =  self._full_object_prepare(child)
+                log.info("Yield initial update {}",x)
+                yield x
 
-        # ?B: submit listening coro of this particular object to nursery
-        await self._child_updating_loop(ws, child)
-        yield None
+            # ?B: submit listening coro of this particular object to nursery
+            await self._child_updating_loop(ws, child)
+            yield None
+        finally:
+            try:
+                self._subscr[ref].remove(ws)
+            except ValueError:
+                log.warning("Tried to remove websocket listener for {}, but it was already removed", ref)
 
 
     async def _child_updating_loop(self, ws, child):
