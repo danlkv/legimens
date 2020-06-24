@@ -123,17 +123,6 @@ class App:
         await self._child_updating_loop(ws, child)
         yield None
 
-    def _full_object_prepare(self, obj):
-        if isinstance(obj, Object):
-            x = {}
-            for name, value in obj.items():
-                name, value = obj._prepare_send(name, value)
-                x[name] = value
-            x = json.dumps(x)
-            return x
-        else:
-            return self.serialize_value(obj)
-
 
     async def _child_updating_loop(self, ws, child):
         """ Listen for incomming updates from websocket
@@ -154,18 +143,37 @@ class App:
                     except Exception as e:
                         log.error(f"{e}. While commiting update to {child}.  "
                                   f"{key} : {value}")
-            except json.JSONDecodeError:
+            except TypeError:
                 log.error("JSON decode error: {}", msg)
 
 
 ## ## ## ## ## ## Serving updates ## ## ## ## ## ## 
+
+    def _full_object_prepare(self, obj):
+        if isinstance(obj, Object):
+            x = {}
+            for name, value in obj.items():
+                name, value = obj._prepare_send(name, value)
+                x[name] = value
+            try:
+                x = json.dumps(x)
+                return x
+            except TypeError:
+                log.error("Failed to serialize updates for {} to json:{}", obj, x)
+                return ""
+        else:
+            try:
+                return self.serialize_value(obj)
+            except Exception as e:
+                log.error("Failed to serialize value {}, error: {}", obj, e)
+                return ""
 
     # ?A: Constantly serve all objects updates
     async def _poll_objects(self):
         while True:
             for ref_ in self._watched_children:
                 message = self._full_object_prepare(self._watched_children[ref_])
-                log.debug(f"Poller sending updates to {ref_}")
+                log.trace(f"Poller sending updates to {ref_}")
                 await self._send_message_to_subscribers(ref_, message)
             await self._sleep_func(self._watch_poll_delay)
 
@@ -194,10 +202,16 @@ class App:
                     # Note that if reset updates after send, 
                     # updates put while sending will be lost
                     self._children_updates[ref_] = {}
-                    message = json.dumps(updates)
+                    try:
+                        message = json.dumps(updates)
+                    except TypeError:
+                        log.error("Failed to serialize updates for {} to json:{}", ref_, updates)
+                        continue
+
                     try:
                         await self._send_message_to_subscribers(ref_, message)
-                    except:
+                    except Exception as e:
+                        log.error("Failed to send updates: {}", e)
                         # We failed to send updates. save them anyway, but owerwrite 
                         # if keys changed when we were sending
                         with_failed = updates.update(self._children_updates[ref_])
