@@ -2,8 +2,12 @@ from setuptools import setup, find_packages
 
 setup(
     name='legimens',
-    version='0.2.1',
+    version='0.2.2',
     license='MIT',
+
+    author = 'Danil Lykov',
+    author_email = 'lkvdan@gmail.com',
+    url='https://github.com/DaniloZZZ/legimens',
 
     packages=find_packages(),
     python_requires='>=3.6',
