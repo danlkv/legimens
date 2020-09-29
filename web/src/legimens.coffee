@@ -1,3 +1,3 @@
-import Object from './legimens/Object.coffee'
-export default Object
+import LeWidget from './legimens/Widget.coffee'
+export default LeWidget
 

@@ -46,7 +46,9 @@ module.exports =
             options:
               presets: ['@babel/env', '@babel/react']
           }
-          'coffee-loader'
+          {
+            loader: 'coffee-loader'
+            options: { sourceMap: true }
         ],
         exclude: /node_modules/
       },
