@@ -18,11 +18,19 @@ export default class Object extends Component
 
   render: ->
     url = @get_url()
-    L_ Websocket, url:url, (data, update) =>
-      setAttr = (attr, value) ->
-        update JSON.stringify [attr]:value
-      if not data
-        data = '{}'
-      data = JSON.parse data
-      @object_props = {@object_props..., data...}
-      @props.children @object_props, setAttr
+    L_ Websocket,
+      url:url
+      onClose: @props.onClose
+      onOpen: @props.onOpen
+      onError: @props.onError
+      (data, update) =>
+        setAttr = (attr, value) ->
+          update JSON.stringify [attr]:value
+        if not data
+          data = '{}'
+        data = JSON.parse data
+        if @props.cache
+          @object_props = {@object_props..., data...}
+        else
+          @object_props = data
+        @props.children @object_props, setAttr
