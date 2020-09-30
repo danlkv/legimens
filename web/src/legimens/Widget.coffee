@@ -136,7 +136,7 @@ statusActionMap =
   [statuses.recv_ref]: ['closeWs', 'cancelTimer']
   [statuses.wait_var]: ['openWs']
   [statuses.connected]: ['reRender']
-  [statuses.lost_conn]: ['setTimer']
+  [statuses.lost_conn]: ['reRender', 'timeTick']
 
 
 on_event = ({event, state, setState, actionsMap}) =>
@@ -161,14 +161,23 @@ export useLegimensRoot = ({addr})=>
   [vars, setVars] = useState()
   stateRef = useRef {addr, status:statuses.dis, ws_url:'', data:{} }
   setState = (state)=>
+    new_data = {stateRef.current.data... , state.data...}
+    state.data = new_data
     stateRef.current = state
   state = stateRef.current
+  state.addr = addr
   timerDelay = 2600
 
   wsRef = useRef()
   timerRef = useRef()
   actions =
+    timeTick: ()=>
+      state = stateRef.current
+      on_event {event:events.time, state, setState, actionsMap:actions}
     setTimer: ()=>
+      if timerRef.current
+        clearTimeout timerRef.current
+
       timerRef.current = setTimeout ()=>
         state = stateRef.current
         on_event {event:events.time, state, setState, actionsMap:actions}
@@ -179,7 +188,12 @@ export useLegimensRoot = ({addr})=>
     openWs: ()=>
       state = stateRef.current
       console.log 'opening websocket. state.ws_url=', state.ws_url
-      wsRef.current = new WebSocket state.ws_url
+      try
+        wsRef.current = new WebSocket state.ws_url
+      catch e
+        state = stateRef.current
+        console.log 'error opening websocket'
+        on_event {event:events.close, state, setState, actionsMap:actions}
       wsRef.current.onclose = ()=>
         state = stateRef.current
         on_event {event:events.close, state, setState, actionsMap:actions}
@@ -189,15 +203,32 @@ export useLegimensRoot = ({addr})=>
         state.data = data
         on_event {event:events.data, state, setState, actionsMap:actions}
     closeWs: ()=>
-      wsRef.current.close 1000
+      if wsRef.current
+        wsRef.current.close 1000
     reRender: ()=>
       console.log 'Triggering re-render'
       state = stateRef.current
       setVars {state.data...}
 
-  if state.status== statuses.dis
+  connectedStatus = state.status == statuses.connected
+
+  useEffect () =>
+    state = stateRef.current
+    console.log 'in use effect', state
     on_event {event:events.time, state, setState, actionsMap:actions}
-  statusret = {connected: state.status == statuses.connected}
+    return ()=>
+      state = stateRef.current
+      console.log 'in unloading function', state
+      on_event {event:events.close, state, setState, actionsMap:actions}
+      actions.closeWs()
+      wsRef.current.onclose = ()=>
+        console.log 'A leftover websocket was closed'
+      wsRef.current.onmessage = ()=>
+        console.log 'A leftover received data, It will be ignored'
+  ,
+    [addr]
+
+  statusret = {connected: connectedStatus}
   return {data:vars, status:statusret}
 
 
