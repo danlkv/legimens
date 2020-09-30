@@ -32,6 +32,46 @@ events =
   data: 'Message received'
   time: 'TimeTick'
 
+###
+                                                                                                                                     
+R - reference websocket
+1 - websocket opened
+3 - websocket closed
+* - received root ref
+D - received Data
+
+/event/
+action()
+
+
+                                                                                                                                     
+                                                                                                                                     
+                  +-------------+      /data/    +--------------+                                                                    
+   openWs() ----- |     R1      ----------------->      R*1     |---- colseWs()                                                      
+                  |  Wait ref   |                | Received ref |     cancelTimer()                                                  
+                  +------^------+                +-------|------+                                                                    
+                         |   |                           |                                                                           
+                  /time/ |   | /close/                   | /close/                                                                   
+                         |   |                           |                                                                           
+                         |   v                           |                                                                           
+                  +-------------+     /close/    +-------v------+                                                                    
+  setTimer() ---- |     R3      <-----------------  R*3 V*1 V0  |--- openWs()                                                        
+                  |  Disconnect |                |   Wait vars  |                                                                    
+                  +------^------+                +-------|------+                                                                    
+                         |                               |                                                                           
+                  /time/ |                               | /data/                                                                    
+                         |                               |                                                                           
+                         |                               |                                                                           
+                 +---------------+    /close/    +-------v------+                                                                    
+  reRender() --- |   V*3 V*3D    <----------------     V*1D     <-----  reRender()                                                   
+                 |   Lost conn   |               |   Connected  |    ^                                                               
+                 +---------------+               +-------|------+    |                                                               
+                                                         |  /data/   |                                                               
+                                                         v           |                                                               
+                                                         ------------>                    
+
+###
+
 get_next_status = (event, status)=>
   if status == statuses.dis
     if event == events.time
@@ -96,7 +136,7 @@ statusActionMap =
   [statuses.recv_ref]: ['closeWs', 'cancelTimer']
   [statuses.wait_var]: ['openWs']
   [statuses.connected]: ['reRender']
-  [statuses.lost_conn]: ['reRender', 'setTimer']
+  [statuses.lost_conn]: ['setTimer']
 
 
 on_event = ({event, state, setState, actionsMap}) =>
