@@ -15,36 +15,170 @@ get_ws_url = ({addr, ref}) =>
   url = addr + ref
   url
 
-export default useLegimensWithTimer = ({addr, ref})=>
-  [tick, setTick] = useState 0
-  console.log 'useref'
+###
+# State machine that governs the process
+###
+
+statuses =
+  dis: 'Disconnected_R3'
+  wait_ref: 'Wait_Ref_R1'
+  wait_var: 'Wait_Var_R*3.V*1'
+  recv_ref: 'Received_Ref_R*1'
+  connected: 'Connected_V*1D'
+  lost_conn: 'LostConnection_V*3.V*3D'
+
+events =
+  close: 'Close'
+  data: 'Message received'
+  time: 'TimeTick'
+
+get_next_status = (event, status)=>
+  if status == statuses.dis
+    if event == events.time
+      return statuses.wait_ref
+    else
+      return statuses.dis
+
+  else if status == statuses.wait_ref
+    if event == events.close
+      return statuses.dis
+    else if event == events.data
+      return statuses.recv_ref
+    else
+      return statuses.wait_ref ## This should not be reached
+
+  else if status == statuses.recv_ref
+    if event == events.close
+      return statuses.wait_var
+    else if event == events.data
+      console.log 'Got data in closed state. Investigate.'
+      return statuses.wait_var ## Why did we get data in cosed state?
+    else
+      return statuses.wait_var ## Why did we get data in cosed state?
+
+  else if status == statuses.wait_var
+    if event == events.close
+      console.log 'Failed to retreive variables'
+      return statuses.dis
+    else if event == events.data
+      return statuses.connected
+    else
+      return statuses.wait_var
+  else if status == statuses.connected
+    if event == events.close
+      return statuses.lost_conn
+    else if event == events.data
+      return statuses.connected
+
+  else if status == statuses.lost_conn
+    if event == events.time
+      return statuses.dis
+    else if event == events.data
+      console.log("Wierd: we lost connection, but retreived data")
+      return statuses.dis
+  return status
+
+
+get_next_state = (event, state) =>
+  {addr, data, status} = state
+  next_status = get_next_status event, status
+  console.log 'prevstatus', status, 'next status', next_status
+  if next_status == statuses.wait_ref
+    next_ws_url = get_ws_url {addr, ref:''}
+  else if next_status == statuses.wait_var
+    next_ws_url = get_ws_url {addr, ref:data.root}
+  return {addr, data, status:next_status, ws_url:next_ws_url}
+
+
+statusActionMap =
+  [statuses.dis]: ['setTimer']
+  [statuses.wait_ref]: ['openWs']
+  [statuses.recv_ref]: ['closeWs', 'cancelTimer']
+  [statuses.wait_var]: ['openWs']
+  [statuses.connected]: ['reRender']
+  [statuses.lost_conn]: ['reRender', 'setTimer']
+
+
+on_event = ({event, state, setState, actionsMap}) =>
+  console.log 'on event', event, 'new state', state
+  new_state = get_next_state event, state
+  console.log 'next state', new_state
+  setState new_state
+  actions = statusActionMap[new_state.status]
+  for actionKey in actions
+    action = actionsMap[actionKey]
+    success = action()
+  return
+
+# Hooks
+
+
+###
+# Hooks to use Legimens in React
+###
+
+export useLegimensRoot = ({addr})=>
+  [vars, setVars] = useState()
+  stateRef = useRef {addr, status:statuses.dis, ws_url:'', data:{} }
+  setState = (state)=>
+    stateRef.current = state
+  state = stateRef.current
+  timerDelay = 2600
+
+  wsRef = useRef()
   timerRef = useRef()
-  ret = useLegimens {addr, ref, timerTck:tick}
-  if not ret.status.connected
-    if not timerRef.current
-      console.log 'setti'
+  actions =
+    setTimer: ()=>
       timerRef.current = setTimeout ()=>
-        setTick((t)=>
-          console.log t
-          timerRef.current = null
-          t+1)
+        state = stateRef.current
+        on_event {event:events.time, state, setState, actionsMap:actions}
       ,
-        2000
-  else
-    if timerRef.current
+        timerDelay
+    cancelTimer: ()=>
       clearTimeout timerRef.current
-      console.log 'clearTimeout'
-      timerRef.current = null
-  return ret
+    openWs: ()=>
+      state = stateRef.current
+      console.log 'opening websocket. state.ws_url=', state.ws_url
+      wsRef.current = new WebSocket state.ws_url
+      wsRef.current.onclose = ()=>
+        state = stateRef.current
+        on_event {event:events.close, state, setState, actionsMap:actions}
+      wsRef.current.onmessage = (message)=>
+        state = stateRef.current
+        data = JSON.parse message.data
+        state.data = data
+        on_event {event:events.data, state, setState, actionsMap:actions}
+    closeWs: ()=>
+      wsRef.current.close 1000
+    reRender: ()=>
+      console.log 'Triggering re-render'
+      state = stateRef.current
+      setVars {state.data...}
+
+  if state.status== statuses.dis
+    on_event {event:events.time, state, setState, actionsMap:actions}
+  statusret = {connected: state.status == statuses.connected}
+  return {data:vars, status:statusret}
 
 
-export useLegimens = ({addr, ref, timerTck})=>
-  [data, setData] = useState {}
+export default useLegimens = ({addr, ref, timerTck})=>
   [status, setStatus] = useState connected:false, opened: false
+  [data, setData] = useState {}
   [respond, setRespond] = useState null
+
+  #prevaddr = usePrevious addr, 'addr'
+  #prevref = usePrevious ref, 'ref'
+  #prevdata = usePrevious data, 'data'
+  #prevstatus = usePrevious status, 'status'
+  wsUrlRef = useRef(null)
   ws_url = get_ws_url {addr, ref}
+  if wsUrlRef.current and (wsUrlRef.current != ws_url)
+    console.log 'resetting data, changed addr'
+    data = {}
+  wsUrlRef.current = ws_url
+
   useEffect ()=>
-    console.debug('before ws create', ws)
+    setData {}
     try
       ws = new WebSocket ws_url
       setStatus connected:false, opened:false
@@ -57,7 +191,7 @@ export useLegimens = ({addr, ref, timerTck})=>
         console.error e
         setStatus connected:false, error:e
       ws.addEventListener 'message', (msgData) =>
-        console.log 'messag', msgData, ws
+        #console.log 'messag', msgData, ws
         setData JSON.parse msgData.data
       ws.addEventListener 'open', ()=>
         console.log 'opened connection', ws_url, ws
@@ -75,31 +209,13 @@ export useLegimens = ({addr, ref, timerTck})=>
   return {data, status, respond}
 
 
-export useLegimensRoot = ({addr, ref})=>
-  [rootRef, setRootRef] = useState null
-  [vardata, setVardata] = useState {}
 
-  if not rootRef
-    rootLeg = useLegimensWithTimer addr:addr, ref:''
-    handshaked = rootLeg.status.connected and rootLeg.data.root
-    if not handshaked
-      data = vardata
-      status = connected:false, opened:false
-      respond = null
-      return {data, status, respond}
-
-    setRootRef rootLeg.data.root
-    data = vardata
-    status = connected:false
-    respond = null
-    return {data, status, respond}
-
-  else
-    console.log 'RootRef', rootRef
-    varLeg = useLegimensWithTimer addr:addr, ref:rootRef
-    console.log 'varleg', varLeg
-    if varLeg.status.opened and not varLeg.status.connected
-      console.log 'Lost connection!'
-      setVardata varLeg.data
-      setRootRef null
-    return varLeg
+usePrevious = (value, name)=>
+  ref = useRef()
+  useEffect () =>
+    ref.current = value
+    return undefined
+  ,
+    [value]
+  console.log "logPrevious: value of #{name}. Current=", value, "Previous=", ref.current
+  return ref.current
