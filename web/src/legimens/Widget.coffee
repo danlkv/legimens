@@ -194,6 +194,7 @@ export useLegimensRoot = ({addr})=>
         state = stateRef.current
         console.log 'error opening websocket'
         on_event {event:events.close, state, setState, actionsMap:actions}
+
       wsRef.current.onclose = ()=>
         state = stateRef.current
         on_event {event:events.close, state, setState, actionsMap:actions}
@@ -208,7 +209,7 @@ export useLegimensRoot = ({addr})=>
     reRender: ()=>
       console.log 'Triggering re-render'
       state = stateRef.current
-      setVars {state.data...}
+      setVars (old_vars)=>{old_vars..., state.data...}
 
   connectedStatus = state.status == statuses.connected
 
@@ -249,6 +250,7 @@ export default useLegimens = ({addr, ref, timerTck})=>
   wsUrlRef.current = ws_url
 
   useEffect ()=>
+    console.log 'in useeffect legimens', data
     setData {}
     try
       ws = new WebSocket ws_url
@@ -263,7 +265,8 @@ export default useLegimens = ({addr, ref, timerTck})=>
         setStatus connected:false, error:e
       ws.addEventListener 'message', (msgData) =>
         #console.log 'messag', msgData, ws
-        setData JSON.parse msgData.data
+        new_data = JSON.parse msgData.data
+        setData (old_data)=>{old_data..., new_data...}
       ws.addEventListener 'open', ()=>
         console.log 'opened connection', ws_url, ws
         setStatus connected:true, opened:true
