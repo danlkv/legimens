@@ -30,11 +30,12 @@ class Object(AttrSubscrDict):
         return children
 
 def serial(obj):
-    def _tostr(o):
+    """ This part is responsible for serializing Legimens objects properly. """
+    def _o_tostr(o):
         if isinstance(o, Object):
             return ref(o)
 
-    x = obj_map(obj, _tostr)
+    x = obj_map(obj, _o_tostr)
     #x = json.dumps(x)
     return x
 
