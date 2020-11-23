@@ -10,9 +10,8 @@ import logging
 
 logging.getLogger('trio-websocket').setLevel(logging.INFO)
 
-def log_config(level, colorize=True):
-    log.remove()
-    log.add(sys.stderr, level=level, colorize=colorize)
+def log_config(level):
+    log.level(level)
 
 
 from legimens import Object
@@ -33,7 +32,7 @@ class App:
         self._subscr = defaultdict(list, {})
         self._scheduled_coroutines = []
 
-        self._watched_children = weakref.WeakValueDictionary()
+        self._watched_children = weakref.WeakValueDictionary() # consider removing in fawor of modificators.Watcher
         self._watch_poll_delay = 0.2
         self._children_updates = defaultdict(dict, {})
 
@@ -47,6 +46,7 @@ class App:
     def serialize_value(self, value):
         return str(value)
 
+    # Consider removing in favour of modificators.Watcher
     def watch_obj(self, obj):
         self._watched_children[ref(obj)] = obj
         self._child_obj[ref(obj)] = obj
@@ -177,6 +177,7 @@ class App:
                 return ""
 
     # ?A: Constantly serve all objects updates
+    # consider removing, in favour of modificators.Watcher
     async def _poll_objects(self):
         while True:
             for ref_ in self._watched_children:
@@ -260,9 +261,9 @@ class App:
 
                 self._running = True
                 while True:
-                    for coro in self._scheduled_coroutines:
+                    for coro, args in self._scheduled_coroutines:
                         log.debug('Starting coroutine {}', coro)
-                        nursery.start_soon(coro)
+                        nursery.start_soon(coro, *args)
                     self._scheduled_coroutines.clear()
                     await trio.sleep(CORO_SCHEDULER_DELAY)
         except Exception:
@@ -278,8 +279,9 @@ class App:
 
         Args:
             coro(async function): coroutine that will run in main execution loop.
+            args: arguments that will be cassed to coro
         """
-        self._scheduled_coroutines.append(coro)
+        self._scheduled_coroutines.append((coro, args))
 
     def run_sync(self):
         trio.run(self._start)
