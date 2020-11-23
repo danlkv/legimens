@@ -6,7 +6,7 @@ from LeClient import LeClient
 
 import trio
 
-addr, port = '127.0.0.1', 8082
+addr, port = '127.0.0.1', 7082
 
 def test_with_coro__resetting():
     app = App(addr=addr, port=port, log_level='TRACE')
@@ -19,7 +19,7 @@ def test_with_coro__resetting():
             while True:
                 app.vars.value = object
                 await trio.sleep(.05)
-        app.add_coroutine(watch)
+        app.schedule_coroutine(watch)
 
         app.vars.value = object
         _ = client.start(f'ws://{addr}:{port}')

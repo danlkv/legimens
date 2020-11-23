@@ -21,6 +21,8 @@ from legimens.helpers.dictMap import obj_map
 from legimens.websocket.server import start_server
 from legimens.websocket.server import ConnectionClosed
 
+CORO_SCHEDULER_DELAY = 0.5
+
 class App:
     def __init__(self, addr, port, log_level='INFO'):
         self.addr = addr
@@ -29,7 +31,7 @@ class App:
         self.vars = Object()
         self._child_obj = weakref.WeakValueDictionary()
         self._subscr = defaultdict(list, {})
-        self._coroutines_to_start = []
+        self._scheduled_coroutines = []
 
         self._watched_children = weakref.WeakValueDictionary()
         self._watch_poll_delay = 0.2
@@ -258,19 +260,26 @@ class App:
 
                 self._running = True
                 while True:
-                    for coro in self._coroutines_to_start:
+                    for coro in self._scheduled_coroutines:
                         log.debug('Starting coroutine {}', coro)
                         nursery.start_soon(coro)
-                    self._coroutines_to_start.clear()
-                    await trio.sleep(.3)
+                    self._scheduled_coroutines.clear()
+                    await trio.sleep(CORO_SCHEDULER_DELAY)
         except Exception:
             self._running = False
             log.info("App crashed.")
             raise
         log.info("App stopped")
 
-    def add_coroutine(self, coro, *args):
-        self._coroutines_to_start.append(coro)
+    def schedule_coroutine(self, coro, *args):
+        """
+        Schedule a custom coroutine.
+        Corutines are started every CORO_SCHEDULER_DELAY seconds (default 0.5).
+
+        Args:
+            coro(async function): coroutine that will run in main execution loop.
+        """
+        self._scheduled_coroutines.append(coro)
 
     def run_sync(self):
         trio.run(self._start)
