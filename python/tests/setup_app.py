@@ -1,12 +1,12 @@
 from legimens import Object, App
 
-def setup_app(addr='127.0.0.1', port=8082):
+def setup_app(addr='127.0.0.1', port=7082):
     app = App(addr=addr, port=port)
     app.vars.title = 'Test'
     return app
 
 
-def setup_app_nested(addr='127.0.0.1', port=8082):
+def setup_app_nested(addr='127.0.0.1', port=7082):
     class User(Object):
         pass
     class Post(Object):

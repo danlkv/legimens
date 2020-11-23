@@ -3,57 +3,18 @@ import json
 from multiprocessing import Queue
 from legimens import Object, App
 from legimens.Object import ref
+from LeClient import LeClient
 
 from utils.websocket_client import send_iter, listener_process
 
-addr, port = '127.0.0.1', 8082
-
-# Implementation of Legimens client
-class LeClient:
-    """
-    Listens for updates of `name` variable and
-    allows to yield updates for it
-    """
-    def __init__(self, name, on_connect):
-        self.on_connect = on_connect
-        self.name = name
-
-    async def _start_comm(self, ws):
-        # First, get the root id of variables
-        msg = await ws.get_message()
-        root_id = json.loads(msg)['root']
-        print('<<<root_id<<<', root_id)
-        # Conect to root and get variable ref id
-        await send_iter(f'{self.addr}/{root_id}', self.root_iter)
-        yield None
-        return
-
-    async def root_iter(self, ws):
-        root = await ws.get_message()
-        root = json.loads(root)
-        # Get ref of variable
-        var_ref = root[self.name]
-        # Connect to variable
-        await send_iter(f'{self.addr}/{var_ref}', self.on_connect)
-        yield
-
-    def connect(self, addr):
-        self.addr = addr
-        p1 = listener_process(addr, self._start_comm)
-        p1.start()
-        return p1
+addr, port = '127.0.0.1', 7082
 
 def test_simple_var_poll():
     responses = Queue()
 
-    async def listen_upd(ws):
-        while True:
-            x = await ws.get_message()
-            responses.put(x)
-        yield
 
     app = App(addr=addr, port=port)
-    client = LeClient('value', listen_upd)
+    client = LeClient('value')
     try:
         app.run()
         time.sleep(.05)
@@ -62,14 +23,14 @@ def test_simple_var_poll():
         object = List()
         app.watch_obj(object)
         app.vars.value = ref(object)
-        _ = client.connect(f'ws://{addr}:{port}')
+        _ = client.start(f'ws://{addr}:{port}')
         for i in range(5):
             object.append(i)
             time.sleep(.1)
 
         time.sleep(.1)
-        assert responses.qsize()>0
-        responses = [responses.get() for _ in range(responses.qsize())]
+        assert client.updates_count() > 0
+        responses = client.get_all_updates()
         assert responses[-1] == str(object)
 
     finally:
@@ -79,19 +40,14 @@ def test_simple_var_poll():
 def test_object_poll():
     responses = Queue()
 
-    async def listen_upd(ws):
-        while True:
-            x = json.loads(await ws.get_message())
-            responses.put(x)
-        yield
 
     app = App(addr=addr, port=port)
-    client = LeClient('rapid_updated', listen_upd)
+    client = LeClient('rapid_updated')
 
     try:
         app.run()
         time.sleep(.05)
-        _ = client.connect(f'ws://{addr}:{port}')
+        _ = client.start(f'ws://{addr}:{port}')
 
         class Rollin(Object):
             def __init__(self):
@@ -107,7 +63,6 @@ def test_object_poll():
         # Put data in bursts, use N appends between sleeps
         N = int(0.005/dt)
         app._watch_poll_delay = 0.1
-        # _ = client.connect(f'ws://{addr}:{port}')
         for i in range(int(T//dt)):
             rapid.x += [i]
             if i%N==0:
@@ -118,7 +73,7 @@ def test_object_poll():
         #Wait for finish update
         time.sleep(app._watch_poll_delay)
 
-        responses = [responses.get() for _ in range(responses.qsize())]
+        responses = [json.loads(x) for x in client.get_all_updates()]
         assert responses
         xlens = [len(x['x']) for x in responses]
         assert xlens[-1] == int(T//dt)

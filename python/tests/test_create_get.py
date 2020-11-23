@@ -6,7 +6,7 @@ from setup_app import setup_app
 from legimens.Object import serial
 from loguru import logger as log
 
-addr, port = '127.0.0.1', 8082
+addr, port = '127.0.0.1', 7082
 
 def listener_process(url, generator):
     p = Process(target=(send_iter_sync), args=(url,generator))

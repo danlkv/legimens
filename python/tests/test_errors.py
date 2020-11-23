@@ -6,11 +6,11 @@ from LeClient import LeClient
 
 import trio
 
-addr, port = '127.0.0.1', 8082
+addr, port = '127.0.0.1', 7082
 
 def test_non_json_serializable():
     app = App(addr=addr, port=port, log_level='TRACE')
-    client = LeClient('value')
+    client = LeClient()
     try:
         app.run()
         time.sleep(.05)

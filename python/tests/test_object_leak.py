@@ -8,7 +8,7 @@ implicit watching funcitonality.
 
     Adding many (N) objects should not result in all them stored in _child_obj
     """
-    app = App(addr='127.0.0.1', port=8082)
+    app = App(addr='127.0.0.1', port=7082)
 
     class Int(Object):
         def __init__(self, value):

@@ -10,7 +10,7 @@ addr, port = '127.0.0.1', 7082
 
 def test_with_coro__resetting():
     app = App(addr=addr, port=port, log_level='TRACE')
-    client = LeClient('value')
+    client = LeClient()
     try:
         app.run()
         time.sleep(.05)
@@ -27,7 +27,7 @@ def test_with_coro__resetting():
             object.append(i)
             time.sleep(.02)
 
-        time.sleep(.1)
+        time.sleep(.4)
 
         assert client.updates_count() > 0
         responses = client.get_all_updates()

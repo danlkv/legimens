@@ -6,7 +6,7 @@ from setup_app import setup_app_nested
 from legimens.Object import serial
 from loguru import logger as log
 
-addr, port = '127.0.0.1', 8082
+addr, port = '127.0.0.1', 7082
 
 def test_nested():
     responses = Queue()
