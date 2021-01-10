@@ -1,19 +1,22 @@
 {
   "name": "legimens",
   "author": "Danil Lykov @danlkv (http://lykov.tech)",
-  "version": "1.0.11",
+  "version": "1.1.0",
   "main": "src/legimens.js",
   "license": "GPL-3.0-only",
   "scripts": {
-    "start": "npm run dev",
+    "start": "yarn run dev",
     "dev": "webpack-dev-server",
-    "build": "npm run clean && NODE_ENV=production webpack -p",
+    "build": "yarn run clean && NODE_ENV=production webpack -p",
     "lib": "webpack -p --config webpack-lib.config.coffee",
     "lib-dev": "webpack --mode development --config webpack-lib.config.coffee",
     "clean": "rimraf ./dist/*"
   },
+  "module": "./src/legimens.coffee",
   "dependencies": {
-    "js-yaml": "^3.13.1",
+    "js-yaml": "^3.13.1"
+  },
+  "peerDependencies": {
     "react": "^16.8.6",
     "react-dom": "^16.0.0",
     "react-dom-factories": "^1.0.2"
