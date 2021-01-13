@@ -45,10 +45,11 @@ module.exports =
             loader: 'babel-loader'
             options:
               presets: ['@babel/env', '@babel/react']
-          }
+          },
           {
             loader: 'coffee-loader'
             options: { sourceMap: true }
+          }
         ],
         exclude: /node_modules/
       },
