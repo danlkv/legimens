@@ -7,7 +7,7 @@ module.exports =
     filename: 'legimens.js'
     path: path.resolve(__dirname, 'lib')
     library: 'legimens'
-    libraryTarget: 'commonjs-module'
+    libraryTarget: 'umd'
     publicPath: '/'
   module:
     rules: [
@@ -39,3 +39,12 @@ module.exports =
       },
 
     ]
+  externals:
+    react:
+      root: 'React'
+      commonjs2: 'react'
+      commonjs: 'react'
+    'react-dom':
+      root: 'ReactDom'
+      commonjs: 'react-dom'
+      commonjs2: 'react-dom'
